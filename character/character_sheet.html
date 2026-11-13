@@ -1,0 +1,468 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1600" height="900"></canvas>
+    <script>
+      const W = 1600,
+        H = 900,
+        ctx = document.getElementById("c").getContext("2d"),
+        INK = "#2a1f1a";
+      let seed = 7;
+      function rnd() {
+        seed ^= seed << 13;
+        seed >>>= 0;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed >>>= 0;
+        return seed / 4294967296;
+      }
+      const J = 1.4,
+        jx = (v) => v + (rnd() - 0.5) * J;
+      function line(p, w, c = INK) {
+        ctx.beginPath();
+        ctx.moveTo(jx(p[0]), jx(p[1]));
+        for (let i = 2; i < p.length; i += 2)
+          ctx.lineTo(jx(p[i]), jx(p[i + 1]));
+        ctx.lineWidth = w;
+        ctx.strokeStyle = c;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
+      function poly(p, f, w) {
+        ctx.beginPath();
+        ctx.moveTo(jx(p[0]), jx(p[1]));
+        for (let i = 2; i < p.length; i += 2)
+          ctx.lineTo(jx(p[i]), jx(p[i + 1]));
+        ctx.closePath();
+        if (f) {
+          ctx.fillStyle = f;
+          ctx.fill();
+        }
+        if (w) {
+          ctx.lineWidth = w;
+          ctx.strokeStyle = INK;
+          ctx.lineJoin = "round";
+          ctx.stroke();
+        }
+      }
+      function circ(x, y, r, f, w) {
+        ctx.beginPath();
+        ctx.arc(jx(x), jx(y), r, 0, Math.PI * 2);
+        if (f) {
+          ctx.fillStyle = f;
+          ctx.fill();
+        }
+        if (w) {
+          ctx.lineWidth = w;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+        }
+      }
+      function curve(x1, y1, cx, cy, x2, y2, w) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(cx, cy, x2, y2);
+        ctx.lineWidth = w;
+        ctx.strokeStyle = INK;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+
+      // ---- face: e = expression ----
+      function head(x, y, r, e, lw) {
+        circ(x, y, r, "#ecebe6", lw);
+        // bandana
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r - lw / 2, 0, Math.PI * 2);
+        ctx.clip();
+        poly(
+          [
+            x - r,
+            y - r * 0.62,
+            x + r,
+            y - r * 0.7,
+            x + r,
+            y - r * 0.36,
+            x - r,
+            y - r * 0.28,
+          ],
+          "#c8423a",
+          0,
+        );
+        ctx.fillStyle = "rgba(255,255,255,.55)";
+        for (const [dx, dy] of [
+          [-0.5, -0.45],
+          [0, -0.5],
+          [0.5, -0.52],
+        ]) {
+          ctx.beginPath();
+          ctx.arc(x + dx * r, y + dy * r, r * 0.05, 0, 7);
+          ctx.fill();
+        }
+        ctx.restore();
+        line(
+          [x - r * 0.98, y - r * 0.28, x + r * 0.98, y - r * 0.36],
+          lw * 0.8,
+        );
+        line([x - r * 0.9, y - r * 0.62, x + r * 0.9, y - r * 0.7], lw * 0.8);
+        // knot tails
+        poly(
+          [
+            x + r * 0.95,
+            y - r * 0.5,
+            x + r * 1.45,
+            y - r * 0.75,
+            x + r * 1.35,
+            y - r * 0.45,
+          ],
+          "#c8423a",
+          lw * 0.8,
+        );
+        poly(
+          [
+            x + r * 0.95,
+            y - r * 0.45,
+            x + r * 1.4,
+            y - r * 0.2,
+            x + r * 1.2,
+            y - r * 0.05,
+          ],
+          "#c8423a",
+          lw * 0.8,
+        );
+        // eyes
+        const ex = r * 0.33,
+          ey = y - r * 0.02,
+          er = r * 0.2;
+        const E = {
+          neutral: { p: [0, 0], o: 1, b: [0, 0] },
+          scared: { p: [0, 0], o: 1.25, b: [-0.18, 0.18] },
+          angry: { p: [0, 0.05], o: 0.8, b: [0.25, -0.25] },
+          smirk: { p: [0.12, 0], o: 0.75, b: [-0.05, 0.15] },
+          tired: { p: [0, 0.1], o: 0.6, b: [0, 0] },
+        }[e];
+        for (const s of [-1, 1]) {
+          const cx = x + s * ex;
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(cx, ey, er, er * E.o, 0, 0, 7);
+          ctx.fillStyle = "#fff";
+          ctx.fill();
+          ctx.lineWidth = lw * 0.7;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+          ctx.clip();
+          circ(
+            cx + E.p[0] * er * 1.5,
+            ey + E.p[1] * er * 2 + (e === "scared" ? 0 : er * 0.1),
+            er * (e === "scared" ? 0.35 : 0.55),
+            "#15100e",
+            0,
+          );
+          if (e === "tired") {
+            ctx.fillStyle = "#ecebe6";
+            ctx.fillRect(cx - er, ey - er, er * 2, er * 0.8);
+          }
+          ctx.restore();
+          if (e === "tired")
+            line([cx - er, ey - er * 0.2, cx + er, ey - er * 0.2], lw * 0.6);
+          // brows
+          const by = ey - er * 1.45;
+          const tilt = s < 0 ? E.b[0] : E.b[1];
+          line(
+            [
+              cx - er * 0.9,
+              by + (s < 0 ? tilt : -tilt) * er * -1.2,
+              cx + er * 0.9,
+              by + (s < 0 ? -tilt : tilt) * er * -1.2,
+            ],
+            lw * 0.9,
+          );
+        }
+        // mouth
+        const my = y + r * 0.48;
+        if (e === "neutral")
+          line([x - r * 0.15, my, x + r * 0.15, my], lw * 0.8);
+        if (e === "scared") {
+          ctx.beginPath();
+          ctx.ellipse(x, my + r * 0.03, r * 0.12, r * 0.17, 0, 0, 7);
+          ctx.fillStyle = "#1a1210";
+          ctx.fill();
+        }
+        if (e === "angry") {
+          poly(
+            [
+              x - r * 0.2,
+              my + r * 0.05,
+              x + r * 0.2,
+              my + r * 0.05,
+              x + r * 0.15,
+              my - r * 0.07,
+              x - r * 0.15,
+              my - r * 0.07,
+            ],
+            "#f2efe6",
+            lw * 0.7,
+          );
+          line([x - r * 0.17, my, x + r * 0.17, my], lw * 0.4);
+        }
+        if (e === "smirk")
+          curve(
+            x - r * 0.18,
+            my,
+            x + r * 0.05,
+            my + r * 0.08,
+            x + r * 0.22,
+            my - r * 0.1,
+            lw * 0.8,
+          );
+        if (e === "tired")
+          curve(
+            x - r * 0.15,
+            my + r * 0.04,
+            x,
+            my - r * 0.04,
+            x + r * 0.15,
+            my + r * 0.04,
+            lw * 0.8,
+          );
+        // cheek bandage
+        ctx.save();
+        ctx.translate(x - r * 0.55, y + r * 0.3);
+        ctx.rotate(-0.4);
+        poly(
+          [
+            -r * 0.14,
+            -r * 0.06,
+            r * 0.14,
+            -r * 0.06,
+            r * 0.14,
+            r * 0.06,
+            -r * 0.14,
+            r * 0.06,
+          ],
+          "#e6c08f",
+          lw * 0.5,
+        );
+        ctx.restore();
+      }
+
+      // ---- body ----
+      function body(x, y, s, e, pose) {
+        const lw = Math.max(3, s * 0.045),
+          P = (u, v) => [x + u * s, y + v * s];
+        // backpack (behind)
+        poly(
+          [
+            ...P(-0.27, -1.38),
+            ...P(0.27, -1.38),
+            ...P(0.3, -0.8),
+            ...P(-0.3, -0.8),
+          ],
+          "#6b5a3e",
+          lw,
+        );
+        poly(
+          [
+            ...P(-0.33, -1.0),
+            ...P(-0.27, -1.0),
+            ...P(-0.27, -0.82),
+            ...P(-0.33, -0.82),
+          ],
+          "#5a4a32",
+          lw * 0.6,
+        );
+        // legs
+        const L =
+          pose === "run"
+            ? [
+                [-0.25, -0.4, -0.38, 0],
+                [0.2, -0.45, 0.35, -0.1],
+              ]
+            : [
+                [-0.1, -0.4, -0.13, 0],
+                [0.08, -0.4, 0.12, 0],
+              ];
+        line(
+          [
+            ...P(0, -0.78),
+            ...P(L[0][0], L[0][1]),
+            ...P(L[0][2], L[0][3]),
+            ...P(L[0][2] - 0.1, L[0][3]),
+          ],
+          lw,
+        );
+        line(
+          [
+            ...P(0, -0.78),
+            ...P(L[1][0], L[1][1]),
+            ...P(L[1][2], L[1][3]),
+            ...P(L[1][2] + 0.1, L[1][3]),
+          ],
+          lw,
+        );
+        // jacket
+        poly(
+          [
+            ...P(-0.2, -1.42),
+            ...P(0.2, -1.42),
+            ...P(0.24, -0.66),
+            ...P(-0.24, -0.66),
+          ],
+          "#6f7d4f",
+          lw,
+        );
+        line([...P(0, -1.42), ...P(0, -0.66)], lw * 0.6);
+        poly(
+          [
+            ...P(0.06, -1.0),
+            ...P(0.17, -1.0),
+            ...P(0.17, -0.88),
+            ...P(0.06, -0.88),
+          ],
+          null,
+          lw * 0.6,
+        );
+        // straps
+        line([...P(-0.15, -1.42), ...P(-0.12, -0.95)], lw * 0.9, "#4a3c28");
+        line([...P(0.15, -1.42), ...P(0.12, -0.95)], lw * 0.9, "#4a3c28");
+        // arms + bat
+        const sh = P(0, -1.38);
+        if (pose === "bat") {
+          const hand = P(0.4, -1.3);
+          line([...sh, ...P(0.3, -1.2), ...hand], lw);
+          line([...sh, ...P(-0.3, -1.15), ...P(-0.38, -0.9)], lw);
+          bat(hand[0], hand[1], s, 0.55, lw);
+        } else if (pose === "run") {
+          line([...sh, ...P(0.3, -1.15), ...P(0.42, -1.32)], lw);
+          line([...sh, ...P(-0.28, -1.1), ...P(-0.42, -0.95)], lw);
+          bat(...P(0.42, -1.32), s, 0.9, lw);
+        } else {
+          line([...sh, ...P(0.22, -1.05), ...P(0.28, -0.8)], lw);
+          line([...sh, ...P(-0.22, -1.05), ...P(-0.28, -0.8)], lw);
+          bat(...P(0.28, -0.8), s, 2.9, lw);
+        }
+        head(...P(0, -1.75), 0.34 * s, e, lw);
+      }
+      function bat(x, y, s, rot, lw) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        poly(
+          [
+            -0.025 * s,
+            0.05 * s,
+            0.025 * s,
+            0.05 * s,
+            0.06 * s,
+            -0.8 * s,
+            -0.06 * s,
+            -0.8 * s,
+          ],
+          "#c99a5b",
+          lw * 0.8,
+        );
+        for (let i = 0; i < 3; i++)
+          line(
+            [-0.03 * s, (0.0 - i * 0.05) * s, 0.03 * s, (-0.02 - i * 0.05) * s],
+            lw * 0.6,
+            "#ddd6c6",
+          );
+        ctx.restore();
+      }
+
+      function label(t, x, y, sz = 34) {
+        ctx.font = `900 ${sz}px Inter`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = INK;
+        ctx.shadowColor = "rgba(255,215,230,.9)";
+        ctx.shadowBlur = 18;
+        ctx.fillText(t, x, y);
+        ctx.shadowBlur = 0;
+      }
+
+      document.fonts.load("900 40px Inter").then(() => {
+        let g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#c7b2b6");
+        g.addColorStop(1, "#e2d3c4");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        // ground
+        ctx.fillStyle = "rgba(90,70,60,.12)";
+        ctx.fillRect(0, 760, W, 140);
+        line([0, 760, W, 760], 2, "rgba(42,31,26,.4)");
+        label('MAX "BANDANA" COLE', W / 2, 70, 52);
+        ctx.font = "600 22px Inter";
+        ctx.fillStyle = "#4a3c38";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "Бывший грузчик · выживает с битой и рюкзаком · язвит в любой ситуации",
+          W / 2,
+          108,
+        );
+        // main pose
+        for (const [x, y] of [[260, 755]]) {
+          ctx.fillStyle = "rgba(42,31,26,.18)";
+          ctx.beginPath();
+          ctx.ellipse(x, y, 90, 14, 0, 0, 7);
+          ctx.fill();
+        }
+        body(260, 755, 265, "smirk", "bat");
+        ctx.fillStyle = "rgba(42,31,26,.18)";
+        ctx.beginPath();
+        ctx.ellipse(1380, 755, 80, 12, 0, 0, 7);
+        ctx.fill();
+        body(1380, 755, 250, "neutral", "idle");
+        label("ГЛАВНАЯ ПОЗА", 260, 835, 28);
+        label("ИДЛ", 1380, 835, 28);
+        // expressions
+        const ex = [
+          ["neutral", "СПОКОЕН"],
+          ["scared", "ИСПУГ"],
+          ["angry", "ЗЛОСТЬ"],
+          ["tired", "УСТАЛ"],
+        ];
+        ex.forEach(([e, n], i) => {
+          const x = 640 + (i % 2) * 290,
+            y = 280 + Math.floor(i / 2) * 270;
+          ctx.fillStyle = "rgba(255,255,255,.35)";
+          ctx.fillRect(x - 115, y - 120, 230, 230);
+          head(x - 15, y - 10, 80, e, 5);
+          label(n, x, y + 95, 24);
+        });
+        // palette
+        const pal = [
+          ["#ecebe6", "кожа"],
+          ["#c8423a", "бандана"],
+          ["#6f7d4f", "куртка"],
+          ["#6b5a3e", "рюкзак"],
+          ["#c99a5b", "бита"],
+          ["#2a1f1a", "контур"],
+        ];
+        pal.forEach(([c, n], i) => {
+          const x = 560 + i * 95;
+          circ(x, 820, 22, c, 3);
+          ctx.font = "600 15px Inter";
+          ctx.fillStyle = "#3a2e2a";
+          ctx.textAlign = "center";
+          ctx.fillText(n, x, 862);
+        });
+        window.ready = true;
+      });
+    </script>
+  </body>
+</html>
