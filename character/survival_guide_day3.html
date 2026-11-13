@@ -1,0 +1,776 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1080" height="1920"></canvas>
+    <script>
+      const W = 1080,
+        H = 1920,
+        ctx = document.getElementById("c").getContext("2d");
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v)),
+        lerp = (a, b, t) => a + (b - a) * t;
+      const ease = (t) => {
+        t = clamp(t, 0, 1);
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      };
+      const backOut = (t) => {
+        t = clamp(t, 0, 1);
+        const c = 1.7;
+        return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+      };
+      let seed = 1;
+      const srand = (s) => {
+        seed = s >>> 0 || 1;
+      };
+      const rnd = () => {
+        seed ^= seed << 13;
+        seed >>>= 0;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed >>>= 0;
+        return seed / 4294967296;
+      };
+      function seg(x1, y1, x2, y2, w, c) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineWidth = w;
+        ctx.strokeStyle = c;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+      function seg3(p, w, c) {
+        ctx.beginPath();
+        ctx.moveTo(p[0], p[1]);
+        for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+        ctx.lineWidth = w;
+        ctx.strokeStyle = c;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
+      function circle(x, y, r, f, sw, sc) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (f) {
+          ctx.fillStyle = f;
+          ctx.fill();
+        }
+        if (sw) {
+          ctx.lineWidth = sw;
+          ctx.strokeStyle = sc || "#111";
+          ctx.stroke();
+        }
+      }
+      function ell(x, y, rx, ry, f, rot = 0) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        ctx.fillStyle = f;
+        ctx.fill();
+      }
+      function rrect(x, y, w, h, r, f) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+        ctx.fillStyle = f;
+        ctx.fill();
+      }
+
+      // arm helper: shoulder -> angle (0=down, +=toward screen-right), length
+      function arm(sx, sy, a, bend, len, w, col, hand, skin) {
+        const ex = sx + Math.sin(a) * len * 0.5,
+          ey = sy + Math.cos(a) * len * 0.5;
+        const hx = ex + Math.sin(a + bend) * len * 0.5,
+          hy = ey + Math.cos(a + bend) * len * 0.5;
+        seg3([sx, sy, ex, ey, hx, hy], w, col);
+        circle(hx, hy, w * 0.62, skin);
+        if (hand) hand(hx, hy);
+        return [hx, hy];
+      }
+
+      // ---------- HERO ----------
+      // o:{x,y,s,walk,aL,aR,bL,bR,mouth:'o'|'smile'|'flat'|'grr',look,brow,hold}
+      function hero(o) {
+        const s = o.s,
+          x = o.x,
+          y = o.y;
+        const SK = "#e6b48c",
+          GR = "#4e7a3c",
+          JE = "#2c4377";
+        const w = o.walk;
+        let l1 = 0,
+          l2 = 0,
+          bob = 0;
+        if (w != null) {
+          l1 = Math.sin(w) * 0.22;
+          l2 = -l1;
+          bob = Math.abs(Math.cos(w)) * 0.03 * s;
+        }
+        const Y = (v) => y + v * s - bob;
+        // legs
+        const lw = 0.17 * s;
+        seg(x - 0.1 * s, Y(-0.78), x - 0.1 * s + l1 * s, y - 0.06 * s, lw, JE);
+        seg(x + 0.1 * s, Y(-0.78), x + 0.1 * s + l2 * s, y - 0.06 * s, lw, JE);
+        ell(x - 0.13 * s + l1 * s, y - 0.03 * s, 0.15 * s, 0.07 * s, "#1f1f22");
+        ell(x + 0.15 * s + l2 * s, y - 0.03 * s, 0.15 * s, 0.07 * s, "#1f1f22");
+        // back arm
+        arm(
+          x - 0.25 * s,
+          Y(-1.38),
+          o.aL ?? -0.15,
+          o.bL ?? -0.1,
+          0.72 * s,
+          0.15 * s,
+          "#456d34",
+          null,
+          SK,
+        );
+        // torso
+        rrect(x - 0.3 * s, Y(-1.5), 0.6 * s, 0.8 * s, 0.1 * s, GR);
+        rrect(x - 0.32 * s, Y(-0.82), 0.64 * s, 0.08 * s, 0.03 * s, "#3b2a1e");
+        circle(x, Y(-0.78), 0.045 * s, "#d9b24a");
+        // scarf
+        rrect(x - 0.27 * s, Y(-1.52), 0.54 * s, 0.14 * s, 0.05 * s, "#f07a1d");
+        ctx.save();
+        ctx.translate(x - 0.12 * s, Y(-1.42));
+        ctx.rotate(0.08);
+        rrect(-0.06 * s, 0, 0.13 * s, 0.45 * s, 0.03 * s, "#e86d12");
+        ctx.restore();
+        // head
+        const hx = x + 0.02 * s,
+          hy = Y(-1.85),
+          r = 0.32 * s;
+        circle(hx - r * 0.98, hy + r * 0.05, r * 0.18, SK);
+        circle(hx + r * 0.98, hy + r * 0.05, r * 0.18, SK);
+        circle(hx, hy, r, SK);
+        // glasses
+        const lk = (o.look || 0) * r * 0.06;
+        for (const sx of [-1, 1]) {
+          circle(
+            hx + sx * r * 0.36,
+            hy + r * 0.02,
+            r * 0.27,
+            "#fff",
+            r * 0.07,
+            "#111",
+          );
+          circle(
+            hx + sx * r * 0.36 + lk + r * 0.04,
+            hy + r * 0.04,
+            r * 0.1,
+            "#111",
+          );
+        }
+        seg(hx - r * 0.09, hy, hx + r * 0.09, hy, r * 0.06, "#111");
+        if (o.brow) {
+          for (const sx of [-1, 1])
+            seg(
+              hx + sx * r * 0.52,
+              hy - r * 0.38 + o.brow * sx * r * 0.08,
+              hx + sx * r * 0.18,
+              hy - r * 0.38 - o.brow * sx * r * 0.08,
+              r * 0.07,
+              "#3b2a1e",
+            );
+        }
+        // nose
+        ell(hx + r * 0.05, hy + r * 0.32, r * 0.09, r * 0.07, "#d79a72");
+        // mouth
+        const m = o.mouth || "flat",
+          my = hy + r * 0.62;
+        if (m === "o") ell(hx, my, r * 0.12, r * 0.15, "#a32a1e");
+        if (m === "smile") {
+          ctx.beginPath();
+          ctx.arc(hx, my - r * 0.08, r * 0.2, 0.15 * Math.PI, 0.85 * Math.PI);
+          ctx.lineWidth = r * 0.07;
+          ctx.strokeStyle = "#5a2418";
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+        if (m === "flat")
+          seg(hx - r * 0.13, my, hx + r * 0.13, my, r * 0.07, "#5a2418");
+        if (m === "grin") {
+          ctx.beginPath();
+          ctx.arc(hx, my - r * 0.12, r * 0.24, 0.1 * Math.PI, 0.9 * Math.PI);
+          ctx.closePath();
+          ctx.fillStyle = "#a32a1e";
+          ctx.fill();
+        }
+        // colander helmet
+        ctx.beginPath();
+        ctx.arc(hx, hy - r * 0.12, r * 1.06, Math.PI * 1.02, Math.PI * 1.98);
+        ctx.closePath();
+        ctx.fillStyle = "#a8b0ba";
+        ctx.fill();
+        rrect(
+          hx - r * 1.12,
+          hy - r * 0.2,
+          r * 2.24,
+          r * 0.14,
+          r * 0.07,
+          "#8f97a2",
+        );
+        for (const [dx, dy] of [
+          [-0.55, -0.45],
+          [-0.15, -0.6],
+          [0.25, -0.58],
+          [0.6, -0.4],
+          [-0.35, -0.85],
+          [0.1, -0.92],
+          [0.45, -0.82],
+          [-0.75, -0.3],
+        ])
+          circle(hx + dx * r, hy + dy * r, r * 0.07, "#2b2f36");
+        // handle
+        ctx.save();
+        ctx.translate(hx + r * 1.05, hy - r * 0.3);
+        rrect(0, -r * 0.05, r * 0.45, r * 0.1, r * 0.05, "#8f97a2");
+        circle(r * 0.55, 0, r * 0.12, null, r * 0.06, "#8f97a2");
+        ctx.restore();
+        // front arm
+        arm(
+          x + 0.25 * s,
+          Y(-1.38),
+          o.aR ?? 0.15,
+          o.bR ?? 0.1,
+          0.72 * s,
+          0.15 * s,
+          GR,
+          o.hold,
+          SK,
+        );
+      }
+
+      // ---------- ZOMBIE ----------
+      function zombie(o) {
+        const s = o.s,
+          x = o.x,
+          y = o.y,
+          f = o.face || 1;
+        const SK = "#86a56c",
+          SH = o.shirt || "#6d6a72",
+          PA = "#3b3f4a";
+        const w = o.walk ?? 0;
+        const l1 = Math.sin(w) * 0.15;
+        const lw = 0.16 * s;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(f, 1);
+        seg(-0.1 * s, -0.78 * s, (-0.1 + l1) * s, -0.06 * s, lw, PA);
+        seg(0.1 * s, -0.78 * s, (0.1 - l1) * s, -0.06 * s, lw, PA);
+        ell((-0.08 + l1) * s, -0.03 * s, 0.14 * s, 0.06 * s, "#2a2a2a");
+        ell((0.14 - l1) * s, -0.03 * s, 0.14 * s, 0.06 * s, "#2a2a2a");
+        const ar = o.armR ?? -1.45,
+          al = o.armL ?? -1.5;
+        arm(
+          -0.2 * s,
+          -1.36 * s,
+          -al * -1,
+          0.05,
+          0.72 * s,
+          0.14 * s,
+          SK,
+          null,
+          SK,
+        );
+        ctx.beginPath();
+        ctx.moveTo(-0.3 * s, -1.5 * s);
+        ctx.lineTo(0.3 * s, -1.5 * s);
+        ctx.lineTo(0.3 * s, -0.85 * s);
+        ctx.lineTo(0.15 * s, -0.72 * s);
+        ctx.lineTo(0.02 * s, -0.82 * s);
+        ctx.lineTo(-0.14 * s, -0.7 * s);
+        ctx.lineTo(-0.3 * s, -0.8 * s);
+        ctx.closePath();
+        ctx.fillStyle = SH;
+        ctx.fill();
+        const hx = 0.04 * s,
+          hy = -1.84 * s + (o.tilt || 0) * s,
+          r = 0.31 * s;
+        circle(hx, hy, r, SK);
+        // hair tufts
+        ctx.fillStyle = "#3f3a33";
+        ctx.beginPath();
+        ctx.arc(hx - r * 0.2, hy - r * 0.85, r * 0.25, 0, 7);
+        ctx.arc(hx + r * 0.25, hy - r * 0.9, r * 0.2, 0, 7);
+        ctx.fill();
+        // black eyes
+        ell(hx - r * 0.32, hy - r * 0.05, r * 0.17, r * 0.21, "#0d0d0d");
+        ell(hx + r * 0.34, hy - r * 0.08, r * 0.15, r * 0.2, "#0d0d0d");
+        // mouth
+        const mo = o.mouth ?? 1;
+        if (o.tongue) {
+          ell(hx + r * 0.05, hy + r * 0.52, r * 0.22, r * 0.16, "#3a1512");
+          ell(hx + r * 0.25, hy + r * 0.66, r * 0.12, r * 0.16, "#e0708a");
+        } else ell(hx, hy + r * 0.5, r * 0.18, r * 0.12 * mo, "#3a1512");
+        // scar
+        seg(
+          hx - r * 0.75,
+          hy + r * 0.2,
+          hx - r * 0.5,
+          hy + r * 0.35,
+          r * 0.05,
+          "#5e7a4c",
+        );
+        arm(
+          0.2 * s,
+          -1.36 * s,
+          -ar * -1,
+          0.05,
+          0.72 * s,
+          0.14 * s,
+          SK,
+          null,
+          SK,
+        );
+        ctx.restore();
+      }
+      function silhouette(x, y, s, w) {
+        const l = Math.sin(w) * 0.15;
+        ctx.strokeStyle = "#121214";
+        ctx.fillStyle = "#121214";
+        seg(
+          x - 0.08 * s,
+          y - 0.8 * s,
+          x + (-0.08 + l) * s,
+          y,
+          0.13 * s,
+          "#121214",
+        );
+        seg(
+          x + 0.08 * s,
+          y - 0.8 * s,
+          x + (0.08 - l) * s,
+          y,
+          0.13 * s,
+          "#121214",
+        );
+        rrect(
+          x - 0.2 * s,
+          y - 1.45 * s,
+          0.4 * s,
+          0.72 * s,
+          0.06 * s,
+          "#121214",
+        );
+        seg(
+          x + 0.1 * s,
+          y - 1.35 * s,
+          x + 0.7 * s,
+          y - 1.3 * s + Math.sin(w * 0.6) * 0.05 * s,
+          0.11 * s,
+          "#121214",
+        );
+        circle(x + 0.04 * s, y - 1.72 * s, 0.25 * s, "#121214");
+      }
+
+      // ---------- SCENES ----------
+      function sky(t) {
+        let g = ctx.createLinearGradient(0, 180, 0, 1100);
+        g.addColorStop(0, "#3f5f93");
+        g.addColorStop(0.55, "#9da2a8");
+        g.addColorStop(1, "#f4c27a");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        const sg = ctx.createRadialGradient(560, 1000, 10, 560, 1000, 420);
+        sg.addColorStop(0, "rgba(255,214,120,.9)");
+        sg.addColorStop(1, "rgba(255,214,120,0)");
+        ctx.fillStyle = sg;
+        ctx.fillRect(0, 500, W, 800);
+        circle(560, 1010, 120, "#f7d27a");
+      }
+      function hills() {
+        ctx.fillStyle = "#5b6b3e";
+        ctx.beginPath();
+        ctx.moveTo(0, 1080);
+        ctx.bezierCurveTo(200, 960, 380, 1060, 560, 990);
+        ctx.bezierCurveTo(760, 920, 900, 1040, 1080, 980);
+        ctx.lineTo(1080, 1300);
+        ctx.lineTo(0, 1300);
+        ctx.fill();
+        ctx.fillStyle = "#4f6236";
+        ctx.beginPath();
+        ctx.moveTo(0, 1040);
+        ctx.bezierCurveTo(260, 1000, 420, 1090, 700, 1040);
+        ctx.bezierCurveTo(900, 1010, 980, 1060, 1080, 1040);
+        ctx.lineTo(1080, 1300);
+        ctx.lineTo(0, 1300);
+        ctx.fill();
+      }
+      function field() {
+        let g = ctx.createLinearGradient(0, 1165, 0, H);
+        g.addColorStop(0, "#6f8a3f");
+        g.addColorStop(1, "#26381d");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 1165, W, H - 1165);
+        ctx.fillStyle = "rgba(255,255,255,.12)";
+        ctx.fillRect(0, 1165, W, 6);
+      }
+      function scene1(t) {
+        sky(t);
+        hills();
+        ctx.fillStyle = "#4a5a33";
+        ctx.fillRect(0, 1060, W, 110);
+        srand(42);
+        for (let i = 0; i < 34; i++) {
+          const bx = ((rnd() * 1300 + t * (18 + rnd() * 10)) % 1300) - 110,
+            by = 1110 + rnd() * 55,
+            sc = 48 + rnd() * 14;
+          silhouette(bx, by, sc, t * 5 + i);
+        }
+        field();
+        const k = t;
+        const zoom = 1 + 0.04 * k;
+        ctx.save();
+        ctx.translate(540, 1330);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-540, -1330);
+        let aR = lerp(0.2, 3.0, ease(k / 0.5));
+        if (k > 0.5) aR = 3.0 + Math.sin(k * 9) * 0.25;
+        let mouth = "o";
+        if (k > 3.6) mouth = "flat";
+        ell(540, 1335, 170, 26, "rgba(0,0,0,.25)");
+        hero({
+          x: 540,
+          y: 1330,
+          s: 260,
+          aR: k < 3.4 ? aR : lerp(3.0, 0.25, ease((k - 3.4) / 0.4)),
+          bR: k < 3.4 ? 0.25 : 0.1,
+          aL: -0.2,
+          mouth,
+          look: k > 3.6 ? -1 : 0,
+          brow: k > 3.6 ? -0.6 : 0,
+          hold: (hx, hy) => {
+            if (k < 3.6) {
+              ctx.save();
+              ctx.translate(hx, hy);
+              ctx.rotate(-0.4 + Math.sin(k * 9) * 0.2);
+              rrect(-12, -90, 24, 90, 8, "#9aa2ad");
+              circle(0, -100, 18, null, 9, "#9aa2ad");
+              ctx.restore();
+            }
+          },
+        });
+        ctx.restore();
+      }
+      function room() {
+        ctx.fillStyle = "#d9c4a0";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#cdb68f";
+        for (let i = 0; i < 8; i++) ctx.fillRect(i * 150, 0, 70, 1380);
+        let g = ctx.createLinearGradient(0, 1380, 0, H);
+        g.addColorStop(0, "#9c6b45");
+        g.addColorStop(1, "#5c3b25");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 1380, W, H - 1380);
+        ctx.fillStyle = "rgba(0,0,0,.12)";
+        for (let i = 0; i < 7; i++) ctx.fillRect(0, 1380 + i * 90, W, 4);
+        ctx.fillStyle = "#7d5638";
+        ctx.fillRect(0, 1360, W, 26);
+      }
+      function door(x, y, pb) {
+        rrect(x - 20, y - 20, 340, 700, 10, "#6b4428");
+        rrect(x, y, 300, 680, 6, "#a8723f");
+        rrect(x + 30, y + 40, 240, 250, 6, "#9a6636");
+        rrect(x + 30, y + 340, 240, 300, 6, "#9a6636");
+        circle(x + 260, y + 380, 16, "#e0bb4a");
+        if (pb > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x, y, 300, 680);
+          ctx.clip();
+          ctx.fillStyle = "#b77a2f";
+          srand(9);
+          for (let i = 0; i < 14; i++) {
+            const yy = y + 40 + i * 45;
+            if (yy > y + 40 + pb * 620) break;
+            ctx.beginPath();
+            ctx.ellipse(
+              x + 150 + (rnd() - 0.5) * 60,
+              yy,
+              130 + rnd() * 20,
+              26,
+              0.05 * (rnd() - 0.5),
+              0,
+              7,
+            );
+            ctx.fill();
+          }
+          ctx.fillStyle = "rgba(255,230,170,.35)";
+          for (let i = 0; i < 8; i++) {
+            const yy = y + 60 + i * 80;
+            if (yy > y + 40 + pb * 620) break;
+            ctx.fillRect(x + 90, yy, 70, 8);
+          }
+          ctx.restore();
+        }
+      }
+      function scene2(t) {
+        room();
+        const k = t;
+        // window with zombie
+        rrect(80, 820, 330, 380, 8, "#6b4428");
+        rrect(100, 840, 290, 340, 4, "#f2b866");
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(100, 840, 290, 340);
+        ctx.clip();
+        zombie({
+          x: 250 + Math.sin(k * 2) * 10,
+          y: 1490,
+          s: 330,
+          armR: -2.6 + Math.sin(k * 8) * 0.2,
+          armL: -2.6 + Math.cos(k * 8) * 0.2,
+          mouth: 1.2 + 0.4 * Math.sin(k * 6),
+        });
+        ctx.restore();
+        seg(245, 840, 245, 1180, 14, "#6b4428");
+        seg(100, 1010, 390, 1010, 14, "#6b4428");
+        // door
+        const shake = k < 2.2 ? Math.sin(k * 40) * 4 : 0;
+        door(650 + shake, 700, clamp((k - 0.8) / 2.2, 0, 1));
+        // jar
+        rrect(560, 1270, 90, 110, 14, "#b77a2f");
+        rrect(555, 1250, 100, 30, 8, "#d64032");
+        rrect(570, 1300, 70, 40, 4, "#f3e2b8");
+        ell(560, 1462, 200, 26, "rgba(0,0,0,.25)");
+        // hero spreading
+        const sp = k > 0.8 && k < 3.0;
+        hero({
+          x: 520,
+          y: 1450,
+          s: 300,
+          walk: null,
+          aR: sp ? 2.1 + Math.sin(k * 10) * 0.5 : k > 3.2 ? 3.0 : 0.4,
+          bR: sp ? 0.6 : -0.3,
+          aL: -0.3,
+          mouth: k > 2.6 ? "grin" : "flat",
+          look: 1,
+          brow: k > 2.6 ? 0.5 : 0,
+          hold: (hx, hy) => {
+            if (sp) {
+              ctx.save();
+              ctx.translate(hx, hy);
+              ctx.rotate(-0.6);
+              rrect(-8, -80, 16, 90, 6, "#c9ced6");
+              rrect(-14, -110, 28, 40, 10, "#b77a2f");
+              ctx.restore();
+            } else if (k > 3.2) {
+              ctx.save();
+              ctx.translate(hx, hy);
+              rrect(-16, -60, 32, 52, 12, "#e6b48c");
+              rrect(-6, -95, 14, 40, 7, "#e6b48c");
+              ctx.restore();
+            }
+          },
+        });
+      }
+      function scene3(t) {
+        const k = t;
+        let g = ctx.createLinearGradient(0, 0, 0, 1200);
+        g.addColorStop(0, "#1d2a52");
+        g.addColorStop(1, "#59577a");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        circle(860, 300, 70, "#efe7c9");
+        srand(3);
+        ctx.fillStyle = "#fff";
+        for (let i = 0; i < 60; i++) {
+          ctx.globalAlpha = 0.3 + 0.5 * rnd();
+          ctx.fillRect(rnd() * W, rnd() * 700 + 180, 3, 3);
+        }
+        ctx.globalAlpha = 1;
+        // house wall
+        ctx.fillStyle = "#8f7a8c";
+        ctx.fillRect(0, 360, W, 900);
+        ctx.fillStyle = "rgba(0,0,0,.08)";
+        for (let i = 0; i < 14; i++) ctx.fillRect(0, 380 + i * 64, W, 5);
+        // window with hero
+        rrect(90, 830, 290, 300, 8, "#4a3a48");
+        rrect(108, 848, 254, 264, 4, "#f3c46d");
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(108, 848, 254, 264);
+        ctx.clip();
+        hero({
+          x: 235,
+          y: 1460,
+          s: 240,
+          aR: k > 1.3 ? 2.9 : 0.2,
+          bR: 0.1,
+          mouth: "smile",
+          look: 1,
+          brow: -0.3,
+          hold: (hx, hy) => {
+            if (k > 1.3) {
+              ctx.save();
+              ctx.translate(hx, hy);
+              rrect(-16, -60, 32, 52, 12, "#e6b48c");
+              rrect(-6, -95, 14, 40, 7, "#e6b48c");
+              ctx.restore();
+            }
+          },
+        });
+        ctx.restore();
+        seg(235, 848, 235, 1112, 10, "#4a3a48");
+        door(620, 780, 1);
+        // ground
+        g = ctx.createLinearGradient(0, 1440, 0, H);
+        g.addColorStop(0, "#3c4a2b");
+        g.addColorStop(1, "#1c2414");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 1440, W, H - 1440);
+        // zombies licking
+        const Z = [
+          { x: 690, s: 300, shirt: "#6d6a72", ph: 0 },
+          { x: 880, s: 290, shirt: "#7a5a4a", ph: 1.3 },
+          { x: 520, s: 280, shirt: "#4a6170", ph: 2.1 },
+        ];
+        for (const z of Z) {
+          const lick = Math.sin(k * 7 + z.ph);
+          zombie({
+            x: z.x,
+            y: 1470,
+            s: z.s,
+            face: -1,
+            armR: -2.0 + lick * 0.15,
+            armL: -2.2 - lick * 0.15,
+            tongue: true,
+            tilt: lick * 0.03,
+            shirt: z.shirt,
+          });
+          // hearts
+          const hp = (k * 0.6 + z.ph * 0.3) % 1;
+          ctx.globalAlpha = 1 - hp;
+          ctx.fillStyle = "#ff5d7a";
+          ctx.font = "900 60px Inter";
+          ctx.textAlign = "center";
+          ctx.fillText("♥", z.x - 40, 1470 - z.s * 2.3 - hp * 120);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // ---------- TEXT ----------
+      function outlined(txt, x, y, size, fill, stroke, sw) {
+        ctx.font = `900 ${size}px Inter`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = sw;
+        ctx.strokeStyle = stroke;
+        ctx.strokeText(txt, x, y);
+        ctx.fillStyle = fill;
+        ctx.fillText(txt, x, y);
+      }
+      function header(t, day) {
+        outlined("ZOMBIE SURVIVAL GUIDE", 540, 460, 64, "#f1f1f1", "#111", 14);
+        const k = backOut(t / 0.4);
+        ctx.save();
+        ctx.translate(540, 640);
+        ctx.scale(k, k);
+        outlined("DAY " + day, 0, 0, 230, "#e7321f", "#111", 22);
+        ctx.restore();
+      }
+      const LINES = [
+        [0.3, 0.86, "Day three."],
+        [1.4, 1.97, "The zombies learned how to open doors."],
+        [3.6, 1.7, "Great. Just great."],
+        [5.6, 2.17, "So I covered every door in peanut butter."],
+        [8.0, 2.72, "Chunky, not smooth. I'm not a monster."],
+        [11.0, 2.36, "Turns out, zombies love peanut butter."],
+        [13.5, 1.89, "Now they just lick the door all night."],
+      ];
+      const WORDS = [];
+      for (const [s, d, txt] of LINES) {
+        const ws = txt.split(" ");
+        const tot = ws.reduce((a, w) => a + w.length + 2, 0);
+        let c = s;
+        const chunk = [];
+        ws.forEach((w, i) => {
+          const dur = (d * (w.length + 2)) / tot;
+          WORDS.push({ w, s: c, e: c + dur, line: s, idx: i });
+          c += dur;
+        });
+      }
+      function subs(t) {
+        // chunk of up to 3 words
+        const line = LINES.find((l) => t >= l[0] && t < l[0] + l[1] + 0.25);
+        if (!line) return;
+        const ws = WORDS.filter((w) => w.line === line[0]);
+        let cur = ws.findIndex((w) => t >= w.s && t < w.e);
+        if (cur < 0) cur = ws.length - 1;
+        const start = Math.floor(cur / 3) * 3;
+        const ch = ws.slice(start, start + 3);
+        ctx.font = "900 96px Inter";
+        const sp = 26;
+        const widths = ch.map((w) => ctx.measureText(w.w.toUpperCase()).width);
+        const tot = widths.reduce((a, b) => a + b, 0) + sp * (ch.length - 1);
+        const fit = Math.min(1, 980 / tot);
+        ctx.save();
+        ctx.translate(540, 1600);
+        ctx.scale(fit, fit);
+        ctx.translate(-540, -1600);
+        let x = 540 - tot / 2;
+        ch.forEach((w, i) => {
+          const active = start + i === cur;
+          const pop = active ? 1 + 0.08 * Math.max(0, 1 - (t - w.s) / 0.15) : 1;
+          ctx.save();
+          ctx.translate(x + widths[i] / 2, 1600);
+          ctx.scale(pop, pop);
+          outlined(
+            w.w.toUpperCase(),
+            0,
+            0,
+            96,
+            active ? "#ffd21a" : "#ffffff",
+            "#111",
+            16,
+          );
+          ctx.restore();
+          x += widths[i] + sp;
+        });
+        ctx.restore();
+      }
+
+      function render(t) {
+        ctx.clearRect(0, 0, W, H);
+        if (t < 5.4) scene1(t);
+        else if (t < 10.9) scene2(t - 5.4);
+        else scene3(t - 10.9);
+        // cut flash
+        for (const c of [5.4, 10.9]) {
+          const d = t - c;
+          if (d >= 0 && d < 0.12) {
+            ctx.fillStyle = `rgba(255,255,255,${0.6 * (1 - d / 0.12)})`;
+            ctx.fillRect(0, 0, W, H);
+          }
+        }
+        header(t, 3);
+        subs(t);
+        // letterbox
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, W, 180);
+        ctx.fillRect(0, H - 100, W, 100);
+        if (t > 15.4) {
+          ctx.fillStyle = `rgba(0,0,0,${clamp((t - 15.4) / 0.4, 0, 1)})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+      window.render = render;
+      document.fonts.load("900 96px Inter").then(() => {
+        window.ready = true;
+        render(0);
+      });
+    </script>
+  </body>
+</html>
