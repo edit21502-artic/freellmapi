@@ -1,0 +1,2083 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1280" height="720"></canvas>
+    <script>
+      const W = 1280,
+        H = 720,
+        cv = document.getElementById("c"),
+        ctx = cv.getContext("2d"),
+        INK = "#2a1f1a";
+      let seed = 1;
+      const srand = (s) => {
+        seed = s >>> 0 || 1;
+      };
+      const rnd = () => {
+        seed ^= seed << 13;
+        seed >>>= 0;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed >>>= 0;
+        return seed / 4294967296;
+      };
+      const J = 1.2,
+        jx = (v) => v + (rnd() - 0.5) * J;
+      function hash(n) {
+        n = n ^ 61 ^ (n >>> 16);
+        n = n + (n << 3);
+        n = n ^ (n >>> 4);
+        n = Math.imul(n, 0x27d4eb2d);
+        n = n ^ (n >>> 15);
+        return (n >>> 0) / 4294967296;
+      }
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v)),
+        lerp = (a, b, t) => a + (b - a) * t;
+      const ease = (t) => {
+        t = clamp(t, 0, 1);
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      };
+      const backOut = (t) => {
+        t = clamp(t, 0, 1);
+        const c = 1.7;
+        return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+      };
+      function L(p, w, c = INK) {
+        ctx.beginPath();
+        ctx.moveTo(jx(p[0]), jx(p[1]));
+        for (let i = 2; i < p.length; i += 2)
+          ctx.lineTo(jx(p[i]), jx(p[i + 1]));
+        ctx.lineWidth = w;
+        ctx.strokeStyle = c;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
+      function P(p, f, w, c = INK) {
+        ctx.beginPath();
+        ctx.moveTo(jx(p[0]), jx(p[1]));
+        for (let i = 2; i < p.length; i += 2)
+          ctx.lineTo(jx(p[i]), jx(p[i + 1]));
+        ctx.closePath();
+        if (f) {
+          ctx.fillStyle = f;
+          ctx.fill();
+        }
+        if (w) {
+          ctx.lineWidth = w;
+          ctx.strokeStyle = c;
+          ctx.lineJoin = "round";
+          ctx.stroke();
+        }
+      }
+      function C(x, y, r, f, w, c = INK) {
+        ctx.beginPath();
+        ctx.arc(jx(x), jx(y), Math.max(0.4, r), 0, 7);
+        if (f) {
+          ctx.fillStyle = f;
+          ctx.fill();
+        }
+        if (w) {
+          ctx.lineWidth = w;
+          ctx.strokeStyle = c;
+          ctx.stroke();
+        }
+      }
+      function E(x, y, rx, ry, f) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, Math.max(0.3, rx), Math.max(0.3, ry), 0, 0, 7);
+        ctx.fillStyle = f;
+        ctx.fill();
+      }
+      function R(x, y, w, h, f, lw) {
+        P([x, y, x + w, y, x + w, y + h, x, y + h], f, lw);
+      }
+      function G(y0, y1, c0, c1, x = 0, w = W) {
+        const g = ctx.createLinearGradient(0, y0, 0, y1);
+        g.addColorStop(0, c0);
+        g.addColorStop(1, c1);
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y0, w, y1 - y0);
+      }
+      function txt(s, x, y, sz, col, al = "center", font = "900") {
+        ctx.font = `${font} ${sz}px Inter`;
+        ctx.textAlign = al;
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = col;
+        ctx.fillText(s, x, y);
+      }
+      const PAL = {
+        day: {
+          sky: ["#aebcd2", "#ecd9c6"],
+          bld: "#a79bb3",
+          bld2: "#bfb4c8",
+          win: "#d6cde0",
+          ground: "#d3cac6",
+          road: "#b5adb0",
+          haze: "rgba(238,214,204,.34)",
+          lit: 0.15,
+        },
+        dusk: {
+          sky: ["#7f6f96", "#e9ae88"],
+          bld: "#7d6f8c",
+          bld2: "#9a879c",
+          win: "#e8c27a",
+          ground: "#b9a8a6",
+          road: "#9c8f95",
+          haze: "rgba(232,170,140,.3)",
+          lit: 0.4,
+        },
+        dawn: {
+          sky: ["#e9a98a", "#fbe3c0"],
+          bld: "#b59aa6",
+          bld2: "#cdb2b4",
+          win: "#f6dca8",
+          ground: "#d8c8b8",
+          road: "#bfb0a8",
+          haze: "rgba(255,222,186,.36)",
+          lit: 0.1,
+        },
+        night: {
+          sky: ["#0b1130", "#1f2c5c"],
+          bld: "#1a2040",
+          bld2: "#232b52",
+          win: "#e8c27a",
+          ground: "#323a5e",
+          road: "#262c48",
+          haze: "rgba(60,70,130,.22)",
+          lit: 0.3,
+          night: 1,
+        },
+        storm: {
+          sky: ["#232733", "#4a5060"],
+          bld: "#353a4b",
+          bld2: "#444a5c",
+          win: "#e8c27a",
+          ground: "#555a68",
+          road: "#444955",
+          haze: "rgba(120,130,150,.22)",
+          lit: 0.25,
+          night: 1,
+        },
+      };
+      let SH = null,
+        TT = 0,
+        LT = 0;
+      // ---------- sky / city ----------
+      function sky(p, t, hy = 470) {
+        G(0, hy, p.sky[0], p.sky[1]);
+        if (p.night) {
+          srand(777);
+          for (let i = 0; i < 70; i++) {
+            const x = rnd() * W,
+              y = rnd() * hy * 0.8;
+            ctx.globalAlpha =
+              (p === PAL.storm ? 0.0 : 0.35) + 0.3 * Math.sin(t * 3 + i);
+            ctx.fillStyle = "#cfd6ff";
+            ctx.fillRect(x, y, 1.6, 1.6);
+          }
+          ctx.globalAlpha = 1;
+          if (p === PAL.night) {
+            const g = ctx.createRadialGradient(1050, 105, 30, 1050, 105, 180);
+            g.addColorStop(0, "rgba(170,180,230,.3)");
+            g.addColorStop(1, "rgba(170,180,230,0)");
+            ctx.fillStyle = g;
+            ctx.fillRect(820, 0, 460, 320);
+            srand(5 + BO);
+            C(1050, 105, 38, "#cfcfcc", 3);
+            C(1038, 96, 6, "#b9b9b6");
+            C(1064, 116, 4, "#b9b9b6");
+          } else {
+            ctx.fillStyle = "rgba(20,22,30,.5)";
+            for (let i = 0; i < 7; i++)
+              E(
+                ((i * 230 + t * 12) % 1500) - 100,
+                60 + hash(i) * 120,
+                190,
+                46,
+                "rgba(24,26,34,.55)",
+              );
+          }
+        } else {
+          C(
+            1040,
+            p === PAL.dusk ? 330 : 130,
+            p === PAL.dusk ? 64 : 50,
+            p === PAL.day ? "#fff3d6" : "#ffe2a8",
+          );
+          for (const [x, y, w] of [
+            [200, 110, 260],
+            [700, 70, 320],
+            [960, 210, 240],
+          ])
+            E(x + Math.sin(t * 0.2) * 12, y, w / 2, 17, "rgba(255,255,255,.4)");
+        }
+      }
+      function skyline(p, base, sd, o = {}) {
+        srand(sd);
+        let x = -20;
+        while (x < W + 20) {
+          const w = 80 + rnd() * 90,
+            h = 90 + rnd() * 190;
+          ctx.fillStyle = p.bld2;
+          ctx.fillRect(x, base - h, w, h);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(42,31,26,.55)";
+          ctx.strokeRect(x, base - h, w, h);
+          for (let yy = base - h + 14; yy < base - 16; yy += 22)
+            for (let xx = x + 10; xx < x + w - 12; xx += 18) {
+              const lit = rnd() < p.lit && !o.nolight;
+              ctx.fillStyle = lit ? p.win : "rgba(0,0,0,.14)";
+              ctx.fillRect(xx, yy, 8, 11);
+            }
+          x += w + (rnd() < 0.3 ? 14 : 0);
+        }
+        srand(31 + BO);
+      }
+      function smoke(x, base, h, t, a = 0.35) {
+        ctx.fillStyle = `rgba(90,80,90,${a})`;
+        ctx.beginPath();
+        ctx.moveTo(x - 18, base);
+        ctx.bezierCurveTo(
+          x - 30,
+          base - h * 0.5,
+          x + 40 + Math.sin(t) * 12,
+          base - h * 0.7,
+          x + 70,
+          base - h,
+        );
+        ctx.lineTo(x + 140, base - h - 10);
+        ctx.bezierCurveTo(
+          x + 70,
+          base - h * 0.6,
+          x + 22,
+          base - h * 0.4,
+          x + 24,
+          base,
+        );
+        ctx.fill();
+      }
+      function hazeBand(p, y0, y1) {
+        const g = ctx.createLinearGradient(0, y0, 0, y1);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, p.haze);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, y0, W, y1 - y0);
+      }
+      // ---------- props ----------
+      function car(x, y, col = "#7b9d97", sc = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(sc, sc);
+        R(0, -70, 260, 52, col, 3.5);
+        P([44, -70, 80, -112, 184, -112, 218, -70], col, 3.5);
+        P([58, -73, 86, -106, 126, -106, 126, -73], "#d8e2e0", 2.5);
+        P([136, -73, 136, -106, 178, -106, 204, -73], "#d8e2e0", 2.5);
+        C(58, -16, 23, "#3a3236", 3.5);
+        C(204, -16, 23, "#3a3236", 3.5);
+        C(58, -16, 9, "#bdb6aa", 2);
+        C(204, -16, 9, "#bdb6aa", 2);
+        ctx.restore();
+      }
+      function van(x, y, o = {}) {
+        ctx.save();
+        ctx.translate(x, y);
+        R(0, -150, 300, 125, "#e6dcc8", 3.5);
+        P([300, -150, 360, -150, 395, -95, 395, -25, 300, -25], "#e6dcc8", 3.5);
+        P([310, -140, 355, -140, 382, -97, 310, -97], "#cfe0e2", 2.5);
+        if (o.heads) {
+          C(338, -112, 13, "#e8c4a2", 2.5);
+          ctx.beginPath();
+          ctx.arc(338, -115, 14, Math.PI, 0);
+          ctx.fillStyle = "#a9b0b9";
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+        }
+        R(30, -128, 150, 50, "#c98a57", 2.5);
+        txt("BAKERY", 105, -102, 24, "#f3ead2");
+        L([190, -150, 190, -25], 2);
+        C(70, -18, 26, "#3a3236", 3.5);
+        C(320, -18, 26, "#3a3236", 3.5);
+        C(70, -18, 10, "#bdb6aa", 2);
+        C(320, -18, 10, "#bdb6aa", 2);
+        if (o.lights) {
+          ctx.fillStyle = "rgba(255,240,180,.22)";
+          ctx.beginPath();
+          ctx.moveTo(395, -60);
+          ctx.lineTo(700, -110);
+          ctx.lineTo(700, 10);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      function barricade(x, y) {
+        R(x, y - 70, 150, 70, "#8a6a4a", 3);
+        R(x + 30, y - 130, 110, 62, "#6f7f8f", 3);
+        R(x + 120, y - 95, 120, 95, "#9c7b5a", 3);
+        L([x + 10, y - 70, x + 10, y - 150, x + 70, y - 150], 4, "#5a4534");
+        R(x + 150, y - 150, 70, 58, "#b0563f", 3);
+        L([x + 60, y - 170, x + 200, y - 200], 5, "#5a4534");
+      }
+      // ---------- backgrounds: return {gy,s,far} ----------
+      const BG = {};
+      BG.street = (sh, t, lt) => {
+        const p = PAL[sh.pal],
+          o = sh.o;
+        sky(p, t);
+        skyline(p, 430, 11, o);
+        hazeBand(p, 200, 440);
+        for (const [x, h] of [
+          [260, 200],
+          [900, 170],
+        ])
+          if (sh.day > 3 || sh.day === 0) smoke(x, 430, h, t, 0.22);
+        // near facades
+        srand(21);
+        let x = -30,
+          i = 0;
+        while (x < W) {
+          const w = 230 + rnd() * 90,
+            h = 230 + rnd() * 120,
+            by = 470;
+          ctx.fillStyle = p.bld;
+          ctx.fillRect(x, by - h, w, h);
+          for (let yy = by - h + 24; yy < by - 130; yy += 52)
+            for (let xx = x + 26; xx < x + w - 40; xx += 58) {
+              const lit = rnd() < p.lit && !o.nolight;
+              ctx.fillStyle = lit
+                ? p.win
+                : p.night
+                  ? "#11152c"
+                  : "rgba(60,50,70,.35)";
+              ctx.fillRect(xx, yy, 30, 34);
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = "rgba(42,31,26,.6)";
+              ctx.strokeRect(xx, yy, 30, 34);
+            }
+          const aw = ["#c0533f", "#7b9d97", "#d8b04c", "#8796a6"][i % 4];
+          ctx.fillStyle = p.night ? "#161a34" : "rgba(40,34,50,.5)";
+          ctx.fillRect(x + 20, by - 96, w - 110, 70);
+          ctx.fillStyle = aw;
+          ctx.globalAlpha = p.night ? 0.45 : 1;
+          ctx.fillRect(x + 12, by - 112, w - 94, 18);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = p.night ? "#0f1226" : "#5a4a44";
+          ctx.fillRect(x + w - 74, by - 100, 44, 100);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(42,31,26,.7)";
+          ctx.strokeRect(x, by - h, w, h);
+          x += w;
+          i++;
+        }
+        srand(41 + BO);
+        ctx.fillStyle = p.ground;
+        ctx.fillRect(0, 470, W, 70);
+        L([0, 470, W, 470], 3);
+        ctx.fillStyle = p.road;
+        ctx.fillRect(0, 540, W, 180);
+        L([0, 540, W, 540], 3);
+        ctx.setLineDash([46, 34]);
+        L([0, 655, W, 655], 5, p.night ? "#59608a" : "#efe6d6");
+        ctx.setLineDash([]);
+        const pr = o.props || [];
+        if (pr.includes("bus")) {
+          L([1010, 300, 1010, 540], 5);
+          R(880, 300, 200, 14, "#8796a6", 3);
+          R(1090, 330, 44, 44, "#3d5e8c", 3);
+          txt("BUS", 1112, 352, 15, "#fff");
+          R(900, 440, 150, 12, "#8a6a4a", 2.5);
+        }
+        if (pr.includes("car")) car(960, 600);
+        if (pr.includes("van")) van(700, 585);
+        if (pr.includes("ladder")) {
+          for (let k = 0; k < 3; k++) {
+            R(820, 150 + k * 100, 150, 10, "#3a3236", 2);
+            L([830, 160 + k * 100, 950, 250 + k * 100], 4, "#3a3236");
+          }
+          L([965, 150, 965, 470], 4, "#3a3236");
+        }
+        return { gy: 614, s: 128, far: { y: 502, s: 70 } };
+      };
+      BG.booth = (sh, t, lt) => {
+        const r = BG.street(
+          Object.assign({}, sh, { o: Object.assign({}, sh.o, { props: [] }) }),
+          t,
+          lt,
+        );
+        R(700, 330, 190, 210, "#3d4466", 3.5);
+        P([680, 330, 910, 330, 880, 290, 710, 290], "#c0533f", 3.5);
+        R(730, 372, 90, 74, "#f3c46d", 3);
+        R(836, 372, 44, 168, "#2a2f4e", 3);
+        txt("TICKETS", 795, 312, 20, "#f3ead2");
+        const g = ctx.createRadialGradient(775, 410, 10, 775, 410, 220);
+        g.addColorStop(0, "rgba(243,196,109,.3)");
+        g.addColorStop(1, "rgba(243,196,109,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(520, 200, 520, 440);
+        if (sh.o.inside3) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(732, 374, 86, 70);
+          ctx.clip();
+          person({ k: "hero", x: 760, y: 520, s: 64 });
+          person({ k: "riley", x: 795, y: 520, s: 64, f: -1 });
+          ctx.restore();
+        }
+        return r;
+      };
+      BG.city = (sh, t) => {
+        const p = PAL[sh.pal],
+          o = sh.o;
+        sky(p, t, 720);
+        skyline(p, 520, 61, { nolight: 1 });
+        hazeBand(p, 200, 520);
+        ctx.save();
+        ctx.translate(0, 120);
+        skyline(p, 600, 62, {
+          nolight: o.nolight || sh.day >= 7 || sh.day === 0,
+        });
+        ctx.restore();
+        for (const [x, h] of [
+          [180, 300],
+          [520, 380],
+          [880, 330],
+          [1100, 260],
+        ])
+          smoke(x, 520, h, t, 0.3);
+        ctx.fillStyle = p.night ? "#0d1128" : "#4a4250";
+        ctx.fillRect(0, 650, W, 70);
+        L([0, 650, W, 650], 3);
+        return { gy: 700, s: 60 };
+      };
+      BG.roof = (sh, t) => {
+        const p = PAL[sh.pal],
+          o = sh.o;
+        sky(p, t);
+        skyline(p, 450, 71, { nolight: sh.day >= 7 });
+        hazeBand(p, 220, 450);
+        if (!p.night || 1)
+          for (const [x, h] of [
+            [240, 210],
+            [840, 180],
+          ])
+            smoke(x, 450, h, t, 0.2);
+        srand(81 + BO);
+        R(-10, 432, W + 20, 46, p.night ? "#3d4466" : "#b6a9ad", 3);
+        L([-10, 454, W + 10, 454], 2);
+        G(
+          478,
+          H,
+          p.night ? "#323a5e" : "#a99c9f",
+          p.night ? "#262c48" : "#8e8287",
+        );
+        R(980, 470, 200, 115, p.night ? "#aab0c4" : "#d0d2d8", 3);
+        for (let i = 0; i < 7; i++)
+          L([986, 498 + i * 12, 1174, 498 + i * 12], 1.5);
+        R(250, 515, 22, 70, "#9da2b8", 3);
+        P([242, 517, 280, 517, 274, 502, 248, 502], "#9da2b8", 3);
+        if ((o.props || []).includes("buckets"))
+          for (let i = 0; i < 5; i++) {
+            const bx = 560 + i * 78;
+            P(
+              [bx, 560, bx + 44, 560, bx + 38, 606, bx + 6, 606],
+              ["#8796a6", "#c0533f", "#a9b0b9", "#d8b04c", "#7b9d97"][i],
+              3,
+            );
+            if (o.rain) E(bx + 22, 562, 20, 4, "#9fc0dd");
+          }
+        if (o.throw) {
+          const u = clamp((LT - 1.2) / 1.6, 0, 1);
+          if (u > 0) {
+            const x = lerp(560, 1330, u),
+              y = lerp(380, 300, u) - Math.sin(u * Math.PI) * 190;
+            ctx.setLineDash([12, 10]);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "rgba(60,50,60,.7)";
+            ctx.beginPath();
+            for (let k = 0; k <= 30; k++) {
+              const v = (u * k) / 30,
+                xx = lerp(560, 1330, v),
+                yy = lerp(380, 300, v) - Math.sin(v * Math.PI) * 190;
+              k ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+            clock(x, y, 18, u * 12);
+          }
+        }
+        return { gy: 592, s: 128 };
+      };
+      function clock(x, y, r, rot) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        C(-r * 0.6, -r * 0.85, r * 0.35, "#d9a441", 2);
+        C(r * 0.6, -r * 0.85, r * 0.35, "#d9a441", 2);
+        C(0, 0, r, "#d2453a", 3);
+        C(0, 0, r * 0.72, "#f2efe6", 2);
+        L([0, 0, 0, -r * 0.5], 2);
+        L([0, 0, r * 0.32, r * 0.1], 2);
+        ctx.restore();
+      }
+      function room(p, lit, wall = "#cdbcae", floor = "#9c7b62") {
+        ctx.fillStyle = wall;
+        ctx.fillRect(0, 0, W, 560);
+        ctx.fillStyle = "rgba(0,0,0,.05)";
+        for (let i = 0; i < 9; i++) ctx.fillRect(i * 150 + 40, 0, 60, 560);
+        G(560, H, floor, "#6e5645");
+        L([0, 560, W, 560], 3);
+        R(0, 540, W, 20, "#7d6452", 2);
+      }
+      function windowPane(x, y, w, h, p, t, o = {}) {
+        R(x - 12, y - 12, w + 24, h + 24, "#6b5446", 3);
+        G(y, y + h, p.sky[0], p.sky[1], x, w);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.clip();
+        ctx.translate(x - 200, y - 170);
+        ctx.scale(0.75, 0.75);
+        skyline(p, 560, 91, { nolight: SH.day >= 7 });
+        ctx.restore();
+        if (o.rain) {
+          ctx.strokeStyle = "rgba(200,215,235,.5)";
+          ctx.lineWidth = 1.5;
+          srand(BO * 3 + 2);
+          for (let i = 0; i < 30; i++) {
+            const rx = x + rnd() * w,
+              ry = y + rnd() * h;
+            ctx.beginPath();
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(rx - 5, ry + 16);
+            ctx.stroke();
+          }
+        }
+        L([x + w / 2, y, x + w / 2, y + h], 6, "#6b5446");
+        L([x, y + h / 2, x + w, y + h / 2], 6, "#6b5446");
+      }
+      BG.apt = (sh, t) => {
+        const p = PAL[sh.pal],
+          o = sh.o,
+          pr = o.props || [];
+        room(p);
+        windowPane(120, 130, 270, 250, p, t, { rain: sh.pal === "storm" });
+        // notes on wall
+        if (sh.day >= 5) {
+          R(450, 150, 90, 70, "#f3ead2", 2);
+          for (let i = 0; i < 4; i++)
+            L([460, 165 + i * 14, 530, 165 + i * 14], 1.5);
+        }
+        if (sh.day >= 11) {
+          R(560, 130, 130, 100, "#e8dcc0", 2);
+          L([575, 210, 610, 170, 650, 190, 675, 150], 2.5, "#c0533f");
+        }
+        P([470, 560, 480, 455, 820, 455, 830, 560], "#7d8fa6", 3.5);
+        R(455, 490, 45, 70, "#6e8098", 3);
+        R(800, 490, 45, 70, "#6e8098", 3);
+        L([640, 460, 640, 520], 2);
+        R(900, 470, 190, 90, "#6b5446", 3);
+        R(915, 360, 160, 105, "#22232b", 3.5);
+        if (o.tv === "on") R(923, 368, 144, 89, "#9fc0dd", 0);
+        R(1140, 250, 110, 310, "#8a6a4a", 3.5);
+        C(1160, 410, 6, "#e0bb4a", 2);
+        if (pr.includes("barricade")) barricade(1010, 560);
+        if (pr.includes("bags"))
+          for (let i = 0; i < 3; i++) {
+            P(
+              [
+                300 + i * 70,
+                610,
+                350 + i * 70,
+                610,
+                344 + i * 70,
+                560,
+                306 + i * 70,
+                560,
+              ],
+              ["#76664f", "#5f7b47", "#8796a6"][i],
+              3,
+            );
+          }
+        if (pr.includes("candle")) {
+          R(868, 440, 10, 30, "#f3ead2", 2);
+          E(873, 432, 6, 10 + Math.sin(t * 14) * 2, "#f6c453");
+          const g = ctx.createRadialGradient(873, 430, 5, 873, 430, 260);
+          g.addColorStop(0, "rgba(246,196,83,.35)");
+          g.addColorStop(1, "rgba(246,196,83,0)");
+          SH._glow = [g, 613, 170, 520, 520];
+        }
+        return { gy: 668, s: 160 };
+      };
+      BG.kitchen = (sh, t) => {
+        const p = PAL[sh.pal],
+          o = sh.o,
+          pr = o.props || [];
+        room(p, 1, "#c9cdb8", "#a08a72");
+        windowPane(520, 130, 220, 170, p, t);
+        R(60, 400, 640, 160, "#e0d6c2", 3.5);
+        R(50, 385, 660, 18, "#8a6a4a", 3);
+        for (let i = 0; i < 4; i++) {
+          R(80 + i * 155, 425, 135, 115, null, 2.5);
+          C(147 + i * 155, 440, 5, "#8a6a4a", 1.5);
+        }
+        R(730, 360, 170, 200, "#d8d8d8", 3.5);
+        R(745, 470, 140, 75, "#2b2f36", 2.5);
+        for (let i = 0; i < 4; i++) C(760 + i * 38, 385, 8, "#3a3236", 2);
+        if (pr.includes("flame")) {
+          R(760, 330, 90, 26, "#3a3236", 3);
+          for (let i = 0; i < 4; i++)
+            E(772 + i * 22, 360, 5, 8 + Math.sin(t * 16 + i) * 2, "#5aa0e8");
+        }
+        R(960, 200, 200, 360, "#dfe4e6", 3.5);
+        L([960, 340, 1160, 340], 3);
+        R(972, 280, 10, 40, "#8796a6", 2);
+        R(972, 360, 10, 60, "#8796a6", 2);
+        if (pr.includes("pots"))
+          for (let i = 0; i < 6; i++) {
+            const bx = 90 + i * 96;
+            R(
+              bx,
+              345,
+              66,
+              40,
+              [
+                "#a9b0b9",
+                "#8796a6",
+                "#c0533f",
+                "#a9b0b9",
+                "#d8b04c",
+                "#8796a6",
+              ][i],
+              3,
+            );
+            E(bx + 33, 349, 30, 5, "#9fc0dd");
+            L([bx - 10, 355, bx, 355], 4);
+            L([bx + 66, 355, bx + 76, 355], 4);
+          }
+        return { gy: 668, s: 160 };
+      };
+      BG.hall = (sh, t) => {
+        const p = PAL[sh.pal];
+        ctx.fillStyle = "#b9b2a2";
+        ctx.fillRect(0, 0, W, 560);
+        ctx.fillStyle = "#8d9a8a";
+        ctx.fillRect(0, 380, W, 180);
+        L([0, 380, W, 380], 2.5);
+        G(560, H, "#7d6b5c", "#4f4239");
+        L([0, 560, W, 560], 3);
+        ["4A", "4B", "4C"].forEach((n, i) => {
+          const x = 170 + i * 400;
+          R(x, 230, 150, 330, "#8a6a4a", 3.5);
+          R(x + 18, 250, 114, 120, null, 2.5);
+          R(x + 18, 400, 114, 140, null, 2.5);
+          C(x + 128, 405, 6, "#e0bb4a", 2);
+          txt(n, x + 75, 205, 26, "#3a2e2a");
+        });
+        for (const x of [370, 770, 1170]) {
+          L([x, 0, x, 60], 2.5);
+          P([x - 26, 90, x + 26, 90, x + 14, 58, x - 14, 58], "#e8dcc0", 2.5);
+        }
+        if ((sh.o.props || []).includes("barricade")) barricade(960, 560);
+        return { gy: 668, s: 160 };
+      };
+      BG.stairs = (sh, t) => {
+        ctx.fillStyle = "#a9a39a";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#8c867e";
+        ctx.fillRect(0, 0, W, 120);
+        const st = [];
+        for (let i = 0; i <= 12; i++) {
+          st.push(120 + i * 86, 250 + i * 30);
+          st.push(120 + (i + 1) * 86, 250 + i * 30);
+        }
+        P([...st, 1280, 720, 0, 720, 0, 250], "#7f786f", 3);
+        for (let i = 0; i < 13; i++)
+          L(
+            [163 + i * 86, 250 + i * 30, 163 + i * 86, 160 + i * 30],
+            3,
+            "#4a4038",
+          );
+        L([120, 160, 1280, 565], 6, "#5a4534");
+        R(40, 60, 120, 190, "#8a6a4a", 3);
+        txt(sh.day >= 14 ? "2" : "4", 100, 40, 26, "#3a2e2a");
+        if ((sh.o.props || []).includes("barricade")) {
+          ctx.save();
+          ctx.translate(-40, -70);
+          barricade(560, 560);
+          barricade(640, 470);
+          ctx.restore();
+        }
+        return { gy: 0, s: 122, slope: [120, 250, 86 / 30] };
+      };
+      BG.tunnel = (sh, t) => {
+        ctx.fillStyle = "#1b1d28";
+        ctx.fillRect(0, 0, W, H);
+        ctx.beginPath();
+        ctx.ellipse(640, 640, 760, 560, 0, Math.PI, 0);
+        ctx.fillStyle = "#2b2e3d";
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#14151d";
+        ctx.stroke();
+        for (let i = 0; i < 9; i++) {
+          ctx.beginPath();
+          ctx.ellipse(640, 640, 760 - i * 70, 560 - i * 52, 0, Math.PI, 0);
+          ctx.strokeStyle = "rgba(10,10,16,.35)";
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+        G(600, H, "#33303a", "#1c1a22");
+        L([0, 600, W, 600], 3, "#111");
+        L([0, 640, W, 640], 5, "#555a68");
+        L([0, 690, W, 690], 5, "#555a68");
+        for (let i = 0; i < 16; i++)
+          L(
+            [i * 90 - ((t * 20) % 90), 632, i * 90 - 20 - ((t * 20) % 90), 700],
+            7,
+            "#3a3038",
+          );
+        if (sh.o.eyes) {
+          srand(303);
+          for (let i = 0; i < 9; i++) {
+            const ex = 760 + rnd() * 500,
+              ey = 380 + rnd() * 190,
+              a = 0.25 + 0.25 * Math.sin(t * 2 + i);
+            ctx.fillStyle = `rgba(230,230,210,${a})`;
+            ctx.fillRect(ex, ey, 5, 4);
+            ctx.fillRect(ex + 13, ey, 5, 4);
+          }
+          srand(BO + 9);
+        }
+        return { gy: 628, s: 126 };
+      };
+      BG.school = (sh, t) => {
+        const p = PAL[sh.pal],
+          o = sh.o;
+        room(p, 1, "#c8cdb6", "#a0886c");
+        windowPane(60, 150, 200, 220, p, t);
+        if (o.board) {
+          ctx.fillStyle = "#2e4a3c";
+          ctx.fillRect(0, 0, W, H);
+          R(60, 60, 1160, 560, "#2e4a3c", 10, "#8a6a4a");
+          srand(404);
+          ctx.strokeStyle = "rgba(240,240,230,.75)";
+          ctx.lineWidth = 3;
+          for (let r = 0; r < 8; r++)
+            for (let c = 0; c < 5; c++) {
+              const x = 120 + c * 215,
+                y = 130 + r * 42;
+              ctx.beginPath();
+              ctx.moveTo(x, y);
+              for (let k = 1; k < 8; k++)
+                ctx.lineTo(x + k * (12 + rnd() * 8), y + (rnd() - 0.5) * 10);
+              ctx.stroke();
+            }
+          srand(BO);
+          ctx.save();
+          ctx.translate(640, 530);
+          ctx.rotate(-0.02);
+          txt("WE WENT TO THE HARBOR", 0, 0, 58, "rgba(245,245,235,.95)");
+          ctx.restore();
+          return { gy: 900, s: 100 };
+        }
+        R(360, 130, 600, 260, "#2e4a3c", 6, "#8a6a4a");
+        srand(404);
+        ctx.strokeStyle = "rgba(240,240,230,.7)";
+        ctx.lineWidth = 2;
+        for (let r = 0; r < 6; r++)
+          for (let c = 0; c < 4; c++) {
+            const x = 390 + c * 140,
+              y = 160 + r * 26;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 70 + rnd() * 40, y + (rnd() - 0.5) * 6);
+            ctx.stroke();
+          }
+        srand(BO);
+        txt("WE WENT TO THE HARBOR", 660, 350, 30, "rgba(245,245,235,.9)");
+        P([1010, 90, 1060, 90, 1070, 150, 1000, 150], "#c9a441", 3);
+        C(1035, 160, 9, "#8a6a4a", 2);
+        for (let i = 0; i < 4; i++) {
+          const x = 180 + i * 270;
+          R(x, 520, 150, 14, "#c9a272", 3);
+          L([x + 12, 534, x + 12, 600], 4);
+          L([x + 138, 534, x + 138, 600], 4);
+        }
+        return { gy: 668, s: 146 };
+      };
+      BG.harbor = (sh, t, lt) => {
+        const p = PAL[sh.pal],
+          o = sh.o;
+        sky(p, t, 430);
+        const sg = ctx.createRadialGradient(1040, 400, 20, 1040, 400, 460);
+        sg.addColorStop(0, "rgba(255,225,150,.75)");
+        sg.addColorStop(1, "rgba(255,225,150,0)");
+        ctx.fillStyle = sg;
+        ctx.fillRect(500, 0, 780, 560);
+        G(430, 560, "#6f9fb0", "#3f6f88");
+        ctx.strokeStyle = "rgba(255,255,255,.4)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 26; i++) {
+          const x = (hash(i) * W + t * 14 * (1 + hash(i + 9))) % W,
+            y = 440 + hash(i + 3) * 110;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 26, y);
+          ctx.stroke();
+        }
+        const by = Math.sin(t * 1.4) * 4;
+        P(
+          [720, 470 + by, 1220, 470 + by, 1170, 535 + by, 770, 535 + by],
+          "#4d5a6a",
+          4,
+        );
+        R(840, 400 + by, 260, 70, "#e6dcc8", 3.5);
+        R(900, 350 + by, 120, 52, "#d8cfc0", 3.5);
+        R(940, 300 + by, 34, 52, "#c0533f", 3);
+        for (let i = 0; i < 5; i++) C(870 + i * 48, 435 + by, 9, "#9fc0dd", 2);
+        E(960 - Math.sin(t) * 6, 270 + by, 26, 12, "rgba(120,110,120,.5)");
+        E(985, 245 + by, 34, 14, "rgba(120,110,120,.35)");
+        G(560, H, "#a79b90", "#7b7068");
+        L([0, 560, W, 560], 3);
+        for (let i = 0; i < 10; i++)
+          L([i * 140, 560, i * 140 - 40, 720], 1.5, "rgba(42,31,26,.3)");
+        // fence + gate
+        const op = o.gate === 2 ? 1 : o.gate === 1 ? ease((lt - 1) / 1.6) : 0;
+        for (let i = 0; i < 16; i++) {
+          const x = i * 84;
+          if (x > 590 && x < 760) continue;
+          L([x, 560, x, 380], 4, "#4a4f5c");
+          L([x, 400, x + 84, 400], 3, "#4a4f5c");
+          L([x, 470, x + 84, 470], 3, "#4a4f5c");
+        }
+        R(586, 360, 14, 200, "#4a4f5c", 3);
+        R(760, 360, 14, 200, "#4a4f5c", 3);
+        ctx.save();
+        ctx.translate(600, 0);
+        ctx.scale(1 - op * 0.9, 1);
+        R(0, 380, 160, 180, null, 4, "#4a4f5c");
+        for (let i = 1; i < 6; i++) L([i * 27, 380, i * 27, 560], 3, "#4a4f5c");
+        ctx.restore();
+        R(1100, 300, 90, 260, "#5d6470", 3.5);
+        R(1085, 260, 120, 44, "#6d7480", 3.5);
+        txt("SAFE ZONE", 680, 340, 26, "#3a2e2a");
+        return { gy: 668, s: 146 };
+      };
+      BG.bridge = (sh, t) => {
+        const p = PAL[sh.pal];
+        sky(p, t, 460);
+        skyline(p, 430, 151, { nolight: 1 });
+        hazeBand(p, 200, 440);
+        G(430, H, "#5f7f95", "#2f4a60");
+        ctx.strokeStyle = "rgba(255,255,255,.3)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 30; i++) {
+          const x = (hash(i) * W + t * 10) % W,
+            y = 470 + hash(i + 3) * 230;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 30, y);
+          ctx.stroke();
+        }
+        P([0, 380, 470, 380, 520, 400, 480, 430, 0, 430], "#7a7480", 4);
+        P([1280, 380, 900, 380, 850, 405, 890, 430, 1280, 430], "#7a7480", 4);
+        for (const x of [120, 360, 1040, 1220])
+          R(x, 430, 40, 300, "#6a6470", 3.5);
+        L([470, 380, 530, 470], 5);
+        L([500, 400, 560, 440], 4);
+        L([900, 380, 840, 460], 5);
+        R(600, 560, 70, 22, "#7a7480", 3);
+        R(720, 600, 50, 18, "#7a7480", 3);
+        L([0, 300, 470, 380], 3);
+        L([1280, 300, 900, 380], 3);
+        for (let i = 0; i < 5; i++) {
+          L([i * 94, 316 + i * 16, i * 94, 380], 2);
+          L([1280 - i * 94, 316 + i * 16, 1280 - i * 94, 380], 2);
+        }
+        smoke(560, 420, 260, t, 0.4);
+        smoke(760, 430, 200, t, 0.3);
+        ctx.save();
+        ctx.translate(40, 380);
+        ctx.scale(0.55, 0.55);
+        van(0, 0);
+        ctx.restore();
+        return { gy: 900, s: 100 };
+      };
+      BG.road = (sh, t, lt) => {
+        const p = PAL[sh.pal],
+          o = sh.o,
+          sp = o.still ? 0 : o.slow ? 90 : 260;
+        sky(p, t);
+        ctx.save();
+        ctx.translate(-((t * sp * 0.15) % 400), 0);
+        skyline(p, 440, 171, { nolight: sh.day >= 7 });
+        ctx.translate(1100, 0);
+        skyline(p, 440, 172, { nolight: 1 });
+        ctx.restore();
+        hazeBand(p, 200, 450);
+        srand(BO + 3);
+        ctx.fillStyle = p.ground;
+        ctx.fillRect(0, 440, W, 60);
+        L([0, 440, W, 440], 3);
+        ctx.fillStyle = p.road;
+        ctx.fillRect(0, 500, W, 220);
+        L([0, 500, W, 500], 3);
+        ctx.setLineDash([60, 50]);
+        ctx.lineDashOffset = (t * sp) % 110;
+        L([0, 640, W, 640], 6, p.night ? "#59608a" : "#efe6d6");
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+        for (let i = 0; i < 4; i++) {
+          const x = ((((i * 420 - t * sp * 0.6) % 1700) + 1700) % 1700) - 200;
+          L([x, 440, x, 330], 4, "#4a4038");
+          L([x, 335, x + 40, 335], 4, "#4a4038");
+        }
+        if ((o.props || []).includes("deadcars"))
+          for (let i = 0; i < 5; i++)
+            car(
+              520 + i * 170,
+              560 + (i % 2) * 46,
+              ["#8796a6", "#c0533f", "#d8b04c", "#7b9d97", "#9c8f95"][i],
+              0.85,
+            );
+        const bob = o.still ? 0 : Math.sin(t * 18) * 1.5;
+        if (o.veh === "van")
+          van(o.still && (o.props || []).length ? 80 : 420, 600 + bob, {
+            heads: 1,
+          });
+        else {
+          car(480, 600 + bob, "#7b9d97", 1.25);
+          C(600, 512 + bob, 13, "#e8c4a2", 2.5);
+        }
+        return { gy: 900, s: 100 };
+      };
+      function aisleDraw(sh, t) {
+        const o = sh.o,
+          VP = { x: 640, y: 300 },
+          F = 235,
+          pr = (X, Y, Z) => [VP.x + (X * F) / Z, VP.y + (Y * F) / Z];
+        const PA = o.pharm
+          ? [
+              ["#e8ecec", "#7b9d97"],
+              ["#dfe6e8", "#c0533f"],
+              ["#f0f0ea", "#8796a6"],
+              ["#d8e2e0", "#d8b04c"],
+            ]
+          : [
+              ["#c0533f", "#efe6d6"],
+              ["#55729a", "#efe6d6"],
+              ["#d8b04c", "#f3ead2"],
+              ["#7f9a5a", "#efe6d6"],
+              ["#7b9d97", "#f0eadb"],
+              ["#c98a57", "#f2e8d6"],
+              ["#a8668a", "#f0e6e0"],
+            ];
+        G(0, VP.y, "#4d4862", "#827c92");
+        G(VP.y, H, "#efe3c4", "#d9c79f");
+        ctx.globalAlpha = 0.25;
+        for (let z = 1.2; z < 14; z *= 1.18)
+          L([...pr(-3, 2.2, z), ...pr(3, 2.2, z)], 1.2, "#a8936a");
+        ctx.globalAlpha = 1;
+        for (let z = 1.6; z < 14; z += 1.3)
+          P(
+            [
+              ...pr(-0.7, -2.6, z),
+              ...pr(0.7, -2.6, z),
+              ...pr(0.7, -2.6, z + 0.5),
+              ...pr(-0.7, -2.6, z + 0.5),
+            ],
+            "#f6f1e2",
+            Math.max(1, 3 / z),
+          );
+        const a = pr(-3, -1.8, 14),
+          b = pr(3, 2.2, 14);
+        R(a[0], a[1], b[0] - a[0], b[1] - a[1], "#f3efe4", 2);
+        for (const sd of [-1, 1]) {
+          const X = sd * 3;
+          for (let z = 13.6; z >= 1; z -= 0.42) {
+            const z2 = z + 0.42;
+            P(
+              [
+                ...pr(X, -1.7, z),
+                ...pr(X, -1.7, z2),
+                ...pr(X, 2.2, z2),
+                ...pr(X, 2.2, z),
+              ],
+              "#8a7a66",
+              0,
+            );
+            for (let li = 0; li < 5; li++) {
+              const Y = -1.25 + li * 0.82,
+                hs = hash(
+                  Math.floor(z * 10) * 13 + li * 7 + (sd > 0 ? 999 : 0),
+                ),
+                pl = PA[Math.floor(hs * PA.length)],
+                empty = o.pharm && hash(Math.floor(z * 10) + li * 3) > 0.5;
+              if (!empty)
+                for (let k = 0; k < 3; k++) {
+                  const za = z + 0.03 + k * 0.13,
+                    zb = za + 0.11;
+                  P(
+                    [
+                      ...pr(X, Y - 0.55, za),
+                      ...pr(X, Y - 0.55, zb),
+                      ...pr(X, Y, zb),
+                      ...pr(X, Y, za),
+                    ],
+                    pl[0],
+                    z < 5 ? 1 : 0,
+                  );
+                  P(
+                    [
+                      ...pr(X, Y - 0.4, za + 0.02),
+                      ...pr(X, Y - 0.4, zb - 0.02),
+                      ...pr(X, Y - 0.28, zb - 0.02),
+                      ...pr(X, Y - 0.28, za + 0.02),
+                    ],
+                    pl[1],
+                    0,
+                  );
+                }
+              P(
+                [
+                  ...pr(X, Y, z),
+                  ...pr(X, Y, z2),
+                  ...pr(X, Y + 0.12, z2),
+                  ...pr(X, Y + 0.12, z),
+                ],
+                "#eee6d2",
+                z < 6 ? 1.2 : 0,
+              );
+            }
+            if (Math.abs((z - 1) % 2.1) < 0.42)
+              L([...pr(X, -1.7, z), ...pr(X, 2.2, z)], Math.max(1, 4 / z));
+          }
+          L([...pr(X, -1.7, 1), ...pr(X, -1.7, 14)], 2);
+          L([...pr(X, 2.2, 1), ...pr(X, 2.2, 14)], 2);
+        }
+        const h1 = pr(-0.9, -2.15, 3.2),
+          h2 = pr(0.9, -1.6, 3.2);
+        R(
+          h1[0],
+          h1[1],
+          h2[0] - h1[0],
+          h2[1] - h1[1],
+          o.pharm ? "#f3efe4" : "#2f8c86",
+          3,
+        );
+        if (o.pharm) {
+          txt(
+            "PHARMACY",
+            (h1[0] + h2[0]) / 2 + 14,
+            (h1[1] + h2[1]) / 2,
+            20,
+            "#3f8f5f",
+          );
+          R(h1[0] + 10, h1[1] + 13, 8, 24, "#3f8f5f", 0);
+          R(h1[0] + 2, h1[1] + 21, 24, 8, "#3f8f5f", 0);
+        } else
+          txt(
+            "AISLE 7 · CANNED GOODS",
+            (h1[0] + h2[0]) / 2,
+            (h1[1] + h2[1]) / 2,
+            13,
+            "#f3ead2",
+          );
+        ctx.fillStyle = "rgba(120,100,110,.14)";
+        ctx.fillRect(0, 0, W, H);
+      }
+      BG.aisle = (sh, t) => {
+        aisleDraw(sh, t);
+        return {
+          gy: 566,
+          s: 122,
+          far: { y: 372, s: 32, x0: 575, x1: 705 },
+          mid: { y: 470, s: 66 },
+        };
+      };
+      BG.window = (sh, t, lt) => {
+        const o = sh.o;
+        ctx.save();
+        ctx.translate(140, 40);
+        ctx.scale(0.78, 0.78);
+        const r = BG.street(sh, t, lt);
+        SH._sub = { gy: r.gy, s: r.s };
+        drawZ(sh, t, lt, r);
+        if (o.rain) rain(t);
+        ctx.restore();
+        ctx.fillStyle = "#2a2430";
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.rect(180, 70, 920, 500);
+        ctx.fill("evenodd");
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = "#4a3a34";
+        ctx.strokeRect(180, 70, 920, 500);
+        L([640, 70, 640, 570], 10, "#4a3a34");
+        L([180, 320, 1100, 320], 10, "#4a3a34");
+        ctx.fillStyle = "#3a3038";
+        ctx.fillRect(140, 570, 1000, 26);
+        if (!o.inside) {
+          ctx.save();
+          ctx.globalAlpha = 0.92;
+          person({ k: "hero", x: 330, y: 900, s: 230, sil: 1 });
+          ctx.restore();
+        }
+        return { gy: 2000, s: 100, noz: 1 };
+      };
+      BG.tv = (sh, t) => {
+        const o = sh.o;
+        ctx.fillStyle = "#2b2630";
+        ctx.fillRect(0, 0, W, H);
+        R(150, 60, 980, 560, "#17171c", 8);
+        R(560, 620, 160, 40, "#17171c", 4);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(180, 90, 920, 500);
+        ctx.clip();
+        if (o.tv === "static") {
+          srand(BO * 17 + 3);
+          const k = clamp(LT / 1.6, 0, 1);
+          for (let i = 0; i < 2600 * (1 - k * 0.7); i++) {
+            ctx.fillStyle = rnd() > 0.5 ? "#ddd" : "#333";
+            ctx.fillRect(180 + rnd() * 920, 90 + rnd() * 500, 6, 3);
+          }
+          ctx.fillStyle = `rgba(0,0,0,${k})`;
+          ctx.fillRect(180, 90, 920, 500);
+        } else {
+          G(90, 590, "#35507c", "#22335a");
+          for (let i = 0; i < 6; i++) {
+            ctx.fillStyle = "rgba(255,255,255,.05)";
+            ctx.fillRect(180 + i * 170, 90, 60, 500);
+          }
+          person({
+            k: "civ",
+            col: "#3b3f55",
+            x: 600,
+            y: 900,
+            s: 330,
+            talk: SH.sp === "ANCHOR",
+            scared: o.shake,
+            ci: 5,
+            tie: 1,
+          });
+          R(180, 470, 920, 120, "#22283e", 4);
+          R(180, 470, 920, 44, "#c0392b", 0);
+          txt("BREAKING NEWS", 400, 493, 32, "#fff");
+          txt(
+            "“AGGRESSIVE FLU” SPREADS — STAY INDOORS",
+            640,
+            550,
+            26,
+            "#f3ead2",
+          );
+          if (o.shake) {
+            ctx.globalAlpha = 0.8;
+            person({
+              k: "z",
+              x: 950 + Math.sin(t * 9) * 8,
+              y: 760,
+              s: 230,
+              f: -1,
+              col: "#6d6a72",
+            });
+            ctx.globalAlpha = 1;
+          }
+        }
+        ctx.restore();
+        ctx.fillStyle = "rgba(160,190,230,.06)";
+        ctx.fillRect(180, 90, 920, 500);
+        return { gy: 2000, s: 100 };
+      };
+      BG.phone = (sh, t) => {
+        const o = sh.o,
+          ring = (sh.o.sfx || []).includes("ring") && LT < 1.7;
+        G(0, H, "#cdbcae", "#a89684");
+        ctx.save();
+        ctx.translate(640 + (ring ? Math.sin(t * 60) * 6 : 0), 360);
+        ctx.rotate(-0.05 + (ring ? Math.sin(t * 50) * 0.02 : 0));
+        ctx.beginPath();
+        ctx.roundRect(-170, -310, 340, 620, 36);
+        ctx.fillStyle = "#1b1b20";
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = INK;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.roundRect(-150, -285, 300, 570, 20);
+        ctx.fillStyle = o.dead ? "#15151a" : "#253a5c";
+        ctx.fill();
+        if (o.dead) {
+          txt("CALL ENDED", 0, -40, 34, "#c0533f");
+          txt("NO SIGNAL", 0, 20, 26, "#888");
+          txt("1%", 110, -255, 20, "#c0533f");
+        } else {
+          C(0, -110, 62, "#8796a6", 4);
+          C(0, -128, 22, "#e8c4a2", 3);
+          ctx.beginPath();
+          ctx.arc(0, -70, 40, Math.PI, 0);
+          ctx.fillStyle = "#e8c4a2";
+          ctx.fill();
+          txt("DAD", 0, 0, 60, "#fff");
+          txt(
+            ring ? "incoming call…" : "00:0" + Math.min(9, Math.floor(LT)),
+            0,
+            52,
+            24,
+            "#b9c6dd",
+          );
+          C(-80, 190, 38, "#c0392b", 3);
+          C(80, 190, 38, "#3f9f5f", 3);
+          txt(sh.day === 9 ? "3%" : "64%", 110, -255, 20, "#ddd");
+          txt(sh.day === 9 ? "▂" : "▂▄▆", -110, -255, 18, "#ddd");
+        }
+        ctx.restore();
+        return { gy: 2000, s: 100 };
+      };
+      BG.radio = (sh, t) => {
+        const o = sh.o;
+        ctx.fillStyle = "#b9b2a2";
+        ctx.fillRect(0, 0, W, 470);
+        G(470, H, "#8a6a4a", "#5e4634");
+        L([0, 470, W, 470], 3);
+        L([820, 250, 930, 70], 5);
+        R(380, 250, 520, 260, "#7a4b34", 5);
+        R(410, 280, 250, 200, "#3a3236", 3);
+        for (let i = 0; i < 8; i++)
+          L([425, 300 + i * 23, 645, 300 + i * 23], 3, "#6b6068");
+        R(690, 290, 180, 60, "#e8dcc0", 3);
+        L(
+          [700 + ((t * 40) % 160), 295, 700 + ((t * 40) % 160), 345],
+          3,
+          "#c0392b",
+        );
+        C(730, 420, 30, "#2b2f36", 3);
+        C(830, 420, 30, "#2b2f36", 3);
+        if (o.on || SH.sp === "RADIO")
+          for (let i = 0; i < 3; i++) {
+            const a = (t * 1.2 + i / 3) % 1;
+            ctx.globalAlpha = 1 - a;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#c0533f";
+            ctx.beginPath();
+            ctx.arc(930, 70, 20 + a * 110, -Math.PI * 0.9, -Math.PI * 0.1);
+            ctx.stroke();
+          }
+        ctx.globalAlpha = 1;
+        R(180, 440, 90, 70, "#e6dcc8", 3);
+        E(225, 444, 40, 7, "#5a4534");
+        return { gy: 2000, s: 100 };
+      };
+      BG.wall = (sh, t, lt) => {
+        const o = sh.o;
+        ctx.fillStyle = "#cdbcae";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(0,0,0,.05)";
+        for (let i = 0; i < 9; i++) ctx.fillRect(i * 150 + 40, 0, 60, H);
+        if (o.map) {
+          R(190, 70, 900, 560, "#ece0c4", 4);
+          srand(505);
+          for (let i = 0; i < 9; i++) {
+            L([200, 90 + i * 62, 1080, 100 + i * 60], 2, "rgba(120,100,80,.4)");
+            L(
+              [210 + i * 105, 80, 220 + i * 105, 620],
+              2,
+              "rgba(120,100,80,.4)",
+            );
+          }
+          for (let i = 0; i < 26; i++)
+            R(
+              215 + rnd() * 800,
+              95 + rnd() * 480,
+              40 + rnd() * 40,
+              26 + rnd() * 20,
+              "rgba(150,135,125,.5)",
+              1.5,
+            );
+          G(70, 630, "rgba(95,127,149,.0)", "rgba(95,127,149,.0)");
+          P([900, 70, 960, 70, 990, 630, 930, 630], "#8fb3c8", 2.5);
+          txt("RIVER", 955, 360, 20, "#4d6a7c");
+          srand(BO);
+          C(290, 520, 14, "#c0392b", 3);
+          txt("HOME", 290, 555, 22, "#3a2e2a");
+          C(1040, 150, 14, "#3f8f5f", 3);
+          txt("HARBOR", 1020, 115, 22, "#3a2e2a");
+          const pts =
+            o.map === 2
+              ? [
+                  290, 520, 420, 470, 520, 380, 700, 330, 860, 400, 1000, 390,
+                  1040, 150,
+                ]
+              : [
+                  290, 520, 420, 470, 520, 380, 700, 330, 840, 240, 960, 190,
+                  1040, 150,
+                ];
+          const n = clamp(lt / 2.2, 0, 1) * (pts.length / 2 - 1);
+          ctx.setLineDash([16, 12]);
+          ctx.lineWidth = 6;
+          ctx.strokeStyle = "#c0392b";
+          ctx.beginPath();
+          ctx.moveTo(pts[0], pts[1]);
+          for (let i = 1; i <= Math.floor(n); i++)
+            ctx.lineTo(pts[i * 2], pts[i * 2 + 1]);
+          const fi = Math.floor(n),
+            fr = n - fi;
+          if (fi < pts.length / 2 - 1)
+            ctx.lineTo(
+              lerp(pts[fi * 2], pts[fi * 2 + 2], fr),
+              lerp(pts[fi * 2 + 1], pts[fi * 2 + 3], fr),
+            );
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (o.map === 2) {
+            txt("TUNNEL", 880, 440, 22, "#c0392b");
+          } else if (sh.day === 8) {
+            C(520, 380, 12, "#3f8f5f", 3);
+            txt("PHARMACY", 520, 350, 20, "#3a2e2a");
+          }
+          return { gy: 2000, s: 100 };
+        }
+        const ls = o.lines || [];
+        ls.forEach((s, i) => {
+          const k = clamp((lt - 0.3 - i * 0.5) / 0.5, 0, 1);
+          ctx.save();
+          ctx.translate(640, 360 + (i - (ls.length - 1) / 2) * 110);
+          ctx.rotate(-0.03 + i * 0.012);
+          ctx.font = "900 82px Inter";
+          const w = ctx.measureText(s).width;
+          ctx.beginPath();
+          ctx.rect(-w / 2 - 10, -60, (w + 20) * k, 120);
+          ctx.clip();
+          txt(s, 0, 0, 82, i === 0 && ls.length > 2 ? "#c0392b" : "#2a1f1a");
+          ctx.restore();
+        });
+        srand(BO);
+        for (let i = 0; i < Math.min(30, sh.day || 0); i++) {
+          const x = 70 + (i % 10) * 26 + Math.floor(i / 5) * 8,
+            y = 620 + Math.floor(i / 10) * 30;
+          L([x, y, x, y + 22], 3);
+        }
+        return { gy: 2000, s: 100 };
+      };
+      BG.title = (sh, t, lt) => {
+        ctx.fillStyle = "#0b0b0f";
+        ctx.fillRect(0, 0, W, H);
+        const ls = sh.o.lines || [];
+        ls.forEach((s, i) => {
+          const k = backOut(clamp((lt - 0.15 - i * 0.35) / 0.4, 0, 1));
+          ctx.save();
+          ctx.translate(
+            640,
+            330 + (i - (ls.length - 1) / 2) * (ls.length > 1 ? 100 : 0),
+          );
+          ctx.scale(k, k);
+          ctx.shadowColor = "rgba(255,120,120,.9)";
+          ctx.shadowBlur = 40;
+          txt(s, 0, 0, ls.length > 1 ? 70 : 150, "#f1e9e4");
+          ctx.restore();
+        });
+        return { gy: 2000, s: 100 };
+      };
+      // ---------- people ----------
+      const CIV = [
+          "#8796a6",
+          "#c98a57",
+          "#7b9d97",
+          "#a8668a",
+          "#d8b04c",
+          "#6d6a72",
+          "#b0563f",
+          "#55729a",
+        ],
+        ZC = [
+          "#c7b48e",
+          "#8fa38c",
+          "#9c8f80",
+          "#7f9bb4",
+          "#b79a76",
+          "#6d6a72",
+          "#a08a9a",
+        ],
+        SKN = ["#e8c4a2", "#d9a982", "#f0d2b6", "#b98660"];
+      function person(o) {
+        const k = o.k,
+          s = o.s * (k === "riley" ? 0.84 : k === "dale" ? 0.96 : 1),
+          x = o.x,
+          y = o.y,
+          f = o.f || 1,
+          lw = Math.max(1.6, s * 0.04),
+          z = k === "z" || k === "biter";
+        const Q = (u, v) => [x + u * s * f, y + v * s];
+        let l1 = 0,
+          by = 0;
+        if (o.walk != null) {
+          l1 = Math.sin(o.walk) * 0.2;
+          by = -Math.abs(Math.cos(o.walk)) * 0.03;
+        }
+        if (o.sil) {
+          ctx.fillStyle = "#17131a";
+          ctx.beginPath();
+          ctx.arc(x, y - 1.6 * s, 0.23 * s, 0, 7);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x, y - 1.63 * s, 0.25 * s, Math.PI, 0);
+          ctx.fill();
+          ctx.fillRect(x - 0.2 * s, y - 1.38 * s, 0.4 * s, 1.4 * s);
+          return;
+        }
+        const hip = Q(0, -0.78 + by);
+        L(
+          [
+            ...hip,
+            ...Q(-0.06 + l1, -0.4),
+            ...Q(-0.08 + l1 * 1.7, 0),
+            ...Q(0.04 + l1 * 1.7, 0),
+          ],
+          lw,
+        );
+        L(
+          [
+            ...hip,
+            ...Q(0.06 - l1, -0.4),
+            ...Q(0.08 - l1 * 1.7, 0),
+            ...Q(0.2 - l1 * 1.7, 0),
+          ],
+          lw,
+        );
+        const sh = Q(0.02, -1.3 + by),
+          ci = o.ci || 0;
+        if (z)
+          L(
+            [
+              ...sh,
+              ...Q(0.34, -1.2 + by + Math.sin((o.walk || TT * 2) * 0.7) * 0.04),
+              ...Q(0.6, -1.22 + by),
+            ],
+            lw,
+          );
+        const col =
+          k === "hero"
+            ? "#5f7b47"
+            : k === "dale"
+              ? "#8a6a4a"
+              : k === "riley"
+                ? "#b8483e"
+                : k === "soldier"
+                  ? "#4d5a3a"
+                  : k === "biter"
+                    ? "#3b3f55"
+                    : o.col || (z ? ZC[ci % ZC.length] : CIV[ci % CIV.length]);
+        if (k === "riley") C(...Q(-0.12, -1.42 + by), 0.11 * s, col, lw * 0.8);
+        P(
+          [
+            ...Q(-0.17, -1.36 + by),
+            ...Q(0.17, -1.36 + by),
+            ...Q(0.21, -0.62 + by),
+            ...(z
+              ? [
+                  ...Q(0.08, -0.55 + by),
+                  ...Q(0, -0.66 + by),
+                  ...Q(-0.1, -0.54 + by),
+                ]
+              : []),
+            ...Q(-0.19, -0.62 + by),
+          ],
+          col,
+          lw,
+        );
+        if (k === "hero") {
+          P(
+            [
+              ...Q(-0.15, -1.42 + by),
+              ...Q(0.17, -1.42 + by),
+              ...Q(0.17, -1.33 + by),
+              ...Q(-0.15, -1.33 + by),
+            ],
+            "#e5772a",
+            lw * 0.8,
+          );
+          P(
+            [
+              ...Q(-0.1, -1.36 + by),
+              ...Q(-0.03, -1.36 + by),
+              ...Q(-0.06, -1.08 + by),
+              ...Q(-0.13, -1.09 + by),
+            ],
+            "#e5772a",
+            lw * 0.8,
+          );
+        }
+        if (k === "dale")
+          L([...Q(0.02, -1.34 + by), ...Q(0.03, -0.64 + by)], lw * 0.6);
+        if (o.tie || k === "biter")
+          P(
+            [
+              ...Q(0.1, -1.34 + by),
+              ...Q(0.16, -1.34 + by),
+              ...Q(0.14, -1.0 + by),
+            ],
+            "#c0392b",
+            lw * 0.5,
+          );
+        let hand;
+        if (z) {
+          hand = Q(0.66, -1.14 + by);
+          L(
+            [
+              ...sh,
+              ...Q(
+                0.38,
+                -1.12 + by + Math.cos((o.walk || TT * 2) * 0.7) * 0.04,
+              ),
+              ...hand,
+            ],
+            lw,
+          );
+        } else if (o.arm === "up") {
+          hand = Q(0.3, -1.86 + by + Math.sin(TT * 3 + x) * 0.02);
+          L([...sh, ...Q(0.22, -1.56 + by), ...hand], lw);
+        } else if (o.arm === "fwd") {
+          hand = Q(0.52, -1.32 + by);
+          L([...sh, ...Q(0.3, -1.2 + by), ...hand], lw);
+        } else {
+          hand = Q(0.08 - l1 * 0.9, -0.72 + by);
+          L([...sh, ...Q(0.1 - l1 * 0.5, -1.0 + by), ...hand], lw);
+        }
+        if (!z)
+          L(
+            [
+              ...sh,
+              ...Q(-0.1 + l1 * 0.5, -1.0 + by),
+              ...Q(-0.08 + l1 * 0.9, -0.72 + by),
+            ],
+            lw,
+          );
+        if (o.item === "phone")
+          R(
+            hand[0] - s * 0.04,
+            hand[1] - s * 0.13,
+            s * 0.08,
+            s * 0.14,
+            "#1b1b20",
+            lw * 0.5,
+          );
+        if (o.item === "clock")
+          clock(hand[0], hand[1] - s * 0.1, s * 0.11, Math.sin(TT * 30) * 0.2);
+        if (o.item === "flash") {
+          R(
+            hand[0] - s * 0.03,
+            hand[1] - s * 0.04,
+            s * 0.16 * f,
+            s * 0.07,
+            "#3a3236",
+            lw * 0.5,
+          );
+        }
+        if (o.item === "cup")
+          R(
+            hand[0],
+            hand[1] - s * 0.1,
+            s * 0.09,
+            s * 0.12,
+            "#f3ead2",
+            lw * 0.6,
+          );
+        const hc = Q(0.02, -1.6 + by),
+          r = 0.21 * s,
+          skin = z
+            ? "#9ea896"
+            : k === "hero"
+              ? "#e8c4a2"
+              : k === "dale"
+                ? "#e2bfa0"
+                : k === "riley"
+                  ? "#d9a982"
+                  : SKN[ci % 4];
+        C(hc[0], hc[1], r, skin, lw);
+        if (z) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(hc[0], hc[1], r - lw / 2, 0, 7);
+          ctx.clip();
+          E(
+            hc[0] + 0.02 * s * f,
+            hc[1] + 0.13 * s,
+            0.16 * s,
+            0.12 * s,
+            "rgba(70,85,72,.35)",
+          );
+          ctx.restore();
+          if (ci % 2 || k === "biter")
+            P(
+              [
+                ...Q(-0.2, -1.62 + by),
+                ...Q(-0.16, -1.78 + by),
+                ...Q(0.04, -1.84 + by),
+                ...Q(0.22, -1.74 + by),
+                ...Q(0.18, -1.66 + by),
+                ...Q(0, -1.74 + by),
+              ],
+              ["#5d4a3a", "#3d3a4c", "#6b4a35"][ci % 3],
+              lw * 0.8,
+            );
+          for (const ex of [0.06, 0.17]) {
+            const e = Q(ex, -1.63 + by);
+            E(e[0], e[1], 0.04 * s, 0.05 * s, "#0b0b0b");
+          }
+          const m = Q(0.13, -1.5 + by);
+          E(
+            m[0],
+            m[1],
+            0.03 * s,
+            0.042 * s * (1 + 0.3 * Math.sin(TT * 5 + x)),
+            "#1a1210",
+          );
+          return;
+        }
+        const e = Q(0.13, -1.62 + by),
+          m = Q(0.13, -1.5 + by);
+        if (k === "hero") {
+          const g1 = Q(0.1, -1.6 + by),
+            g2 = Q(0.205, -1.6 + by);
+          C(g1[0], g1[1], 0.058 * s, "#f6f4ee", lw * 0.7);
+          C(g2[0], g2[1], 0.042 * s, "#f6f4ee", lw * 0.7);
+          C(
+            g1[0] + 0.012 * s * f,
+            g1[1],
+            (o.scared ? 0.014 : 0.022) * s,
+            "#111",
+          );
+          C(
+            g2[0] + 0.01 * s * f,
+            g2[1],
+            (o.scared ? 0.011 : 0.016) * s,
+            "#111",
+          );
+          L([...Q(-0.05, -1.62 + by), ...Q(0.045, -1.61 + by)], lw * 0.6);
+        } else if (o.scared) {
+          C(e[0], e[1], 0.045 * s, "#fff", lw * 0.5);
+          C(e[0], e[1], 0.016 * s, "#111");
+        } else C(e[0], e[1], 0.026 * s, "#111");
+        if (o.talk)
+          E(
+            m[0],
+            m[1],
+            0.028 * s,
+            0.012 * s + 0.03 * s * Math.abs(Math.sin(TT * 13)),
+            "#3a1512",
+          );
+        else if (o.scared) E(m[0], m[1], 0.024 * s, 0.034 * s, "#3a1512");
+        else L([...Q(0.09, -1.49 + by), ...Q(0.16, -1.5 + by)], lw * 0.6);
+        if (k === "hero") {
+          ctx.beginPath();
+          ctx.arc(jx(hc[0]), jx(hc[1] - 0.03 * s), r * 1.06, Math.PI, 0);
+          ctx.closePath();
+          ctx.fillStyle = "#a9b0b9";
+          ctx.fill();
+          ctx.lineWidth = lw;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+          L([...Q(-0.25, -1.66 + by), ...Q(0.27, -1.66 + by)], lw * 1.1);
+          for (const [dx, dy] of [
+            [-0.12, -1.72],
+            [-0.02, -1.76],
+            [0.08, -1.73],
+            [-0.06, -1.82],
+            [0.04, -1.84],
+            [0.14, -1.7],
+            [-0.16, -1.79],
+          ]) {
+            const h = Q(dx, dy + by);
+            E(h[0], h[1], 0.014 * s, 0.014 * s, "#2b2f36");
+          }
+          const h2 = Q(-0.36, -1.7 + by);
+          L([...Q(-0.24, -1.68 + by), ...h2], lw * 1.1, "#7d8590");
+          C(h2[0] - 0.03 * s * f, h2[1], 0.03 * s, null, lw * 0.8);
+        } else if (k === "dale") {
+          P(
+            [
+              ...Q(-0.2, -1.6 + by),
+              ...Q(-0.2, -1.74 + by),
+              ...Q(-0.08, -1.8 + by),
+              ...Q(-0.1, -1.62 + by),
+            ],
+            "#eeeae2",
+            lw * 0.7,
+          );
+          L(
+            [...Q(0.08, -1.535 + by), ...Q(0.2, -1.53 + by)],
+            lw * 1.7,
+            "#eeeae2",
+          );
+          L(
+            [...Q(0.07, -1.69 + by), ...Q(0.18, -1.7 + by)],
+            lw * 0.9,
+            "#eeeae2",
+          );
+        } else if (k === "soldier") {
+          ctx.beginPath();
+          ctx.arc(hc[0], hc[1] - 0.03 * s, r * 1.08, Math.PI, 0);
+          ctx.closePath();
+          ctx.fillStyle = "#4d5a3a";
+          ctx.fill();
+          ctx.lineWidth = lw;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(
+            hc[0] - 0.02 * s * f,
+            hc[1] - 0.02 * s,
+            r * 1.03,
+            Math.PI * (f > 0 ? 0.95 : 1.25),
+            Math.PI * (f > 0 ? 1.75 : 2.05),
+          );
+          ctx.closePath();
+          ctx.fillStyle =
+            k === "riley"
+              ? "#3a2c28"
+              : ["#5d4a3a", "#2f2a2a", "#8a6a4a", "#b9b0a0"][ci % 4];
+          ctx.fill();
+          ctx.lineWidth = lw * 0.8;
+          ctx.strokeStyle = INK;
+          ctx.stroke();
+        }
+      }
+      function shadow(x, y, s) {
+        E(x, y + 2, 0.36 * s, 0.06 * s, "rgba(30,20,30,.2)");
+      }
+      function parseA(str, lt, dur, r) {
+        const m = str.match(
+          /^(\w+)@(-?\d+)(?:(>>?)(-?\d+))?([!^<]*)(?::(\w+))?$/,
+        );
+        let x = +m[2],
+          walk = null,
+          f = 1;
+        const fl = m[5] || "";
+        if (m[3]) {
+          const u =
+            m[3] === ">>"
+              ? ease(clamp(lt / Math.min(dur, 2.6), 0, 1))
+              : clamp(lt / dur, 0, 1);
+          const x2 = +m[4];
+          x = lerp(+m[2], x2, u);
+          if (u < 1) walk = lt * (m[3] === ">>" ? 14 : 7.5) + +m[2];
+          f = x2 < +m[2] ? -1 : 1;
+        }
+        if (fl.includes("<")) f = -1;
+        let y = r.gy;
+        if (r.slope) y = r.slope[1] + (x - r.slope[0]) / r.slope[2];
+        return {
+          k: m[1],
+          x,
+          y,
+          s: r.s,
+          f,
+          walk,
+          scared: fl.includes("!"),
+          arm: fl.includes("^") ? "up" : null,
+          item: m[6],
+        };
+      }
+      function drawZ(sh, t, lt, r) {
+        const o = sh.o;
+        const list = [];
+        if (o.z && !r.noz) {
+          const R0 = o.zfar
+              ? r.far || { y: r.gy - 90, s: r.s * 0.6 }
+              : o.zmid
+                ? r.mid
+                : { y: r.gy, s: r.s },
+            zr = o.zr || [R0.x0 || 40, R0.x1 || W - 40],
+            zm = o.zm == null ? -10 : o.zm;
+          for (let i = 0; i < o.z; i++) {
+            let x =
+              zr[0] +
+              hash(i * 7 + sh.i) * (zr[1] - zr[0]) +
+              zm * lt * (0.7 + hash(i + 3) * 0.6) * (o.zfar ? 0.4 : 1);
+            let y = R0.y + (hash(i * 5 + 1) - 0.5) * (o.zfar ? 14 : 34);
+            if (r.slope) y = r.slope[1] + (x - r.slope[0]) / r.slope[2];
+            list.push({
+              k: "z",
+              x,
+              y,
+              s: R0.s * (0.92 + hash(i + 11) * 0.16),
+              f: zm > 0 ? 1 : zm < 0 ? -1 : hash(i) > 0.5 ? 1 : -1,
+              walk: zm ? lt * 4 + i * 1.7 : null,
+              ci: i,
+            });
+          }
+        }
+        if (o.c) {
+          for (let i = 0; i < o.c; i++) {
+            const cm = o.cm || 0;
+            let x =
+              80 +
+              hash(i * 9 + 2) * (W - 160) +
+              cm * lt * (hash(i) > 0.5 ? 1 : -1) * 2.2;
+            if (o.cphone && Math.abs(x - 640) < 120) x += x < 640 ? -140 : 140;
+            list.push({
+              k: "civ",
+              x,
+              y: r.gy + (hash(i * 3) - 0.5) * 30 - (o.cphone ? 0 : 20),
+              s: r.s * (0.95 + hash(i + 4) * 0.1),
+              f: o.cphone ? (x < 640 ? 1 : -1) : hash(i) > 0.5 ? 1 : -1,
+              walk: cm ? lt * 7 + i : null,
+              ci: i,
+              arm: o.cphone ? "fwd" : null,
+              item: o.cphone ? "phone" : null,
+            });
+          }
+        }
+        (o.a || []).forEach((a, i) => {
+          const pa = parseA(a, lt, sh.dur, r);
+          pa.ci = i + 2;
+          if (
+            o.talk === pa.k &&
+            lt > sh.words[0][1] &&
+            lt < sh.words[sh.words.length - 1][2]
+          )
+            pa.talk = 1;
+          if (pa.k === "hero" && sh.i === 7) pa.item = "cup";
+          list.push(pa);
+        });
+        list.sort((a, b) => a.y - b.y);
+        for (const pz of list) {
+          shadow(pz.x, pz.y, pz.s);
+          person(pz);
+        }
+        return list;
+      }
+      function rain(t) {
+        ctx.strokeStyle = "rgba(200,215,235,.45)";
+        ctx.lineWidth = 2;
+        srand(BO * 5 + 1);
+        for (let i = 0; i < 140; i++) {
+          const x = rnd() * 1400 - 60,
+            y = rnd() * H;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 14, y + 44);
+          ctx.stroke();
+        }
+        srand(BO);
+      }
+      // ---------- subtitles ----------
+      function subs(sh, lt) {
+        const ws = sh.words;
+        if (lt < ws[0][1] - 0.05 || lt > ws[ws.length - 1][2] + 0.35) return;
+        const ch = [];
+        let cur = [];
+        for (const w of ws) {
+          cur.push(w);
+          if (cur.length >= 5 || (/[.,?!]$/.test(w[0]) && cur.length >= 2)) {
+            ch.push(cur);
+            cur = [];
+          }
+        }
+        if (cur.length) {
+          if (cur.length < 2 && ch.length) ch[ch.length - 1].push(...cur);
+          else ch.push(cur);
+        }
+        let c =
+          ch.find((c) => lt < c[c.length - 1][2] + 0.02) || ch[ch.length - 1];
+        ctx.font = "900 50px Inter";
+        const sp = 14,
+          wd = c.map((w) => ctx.measureText(w[0].toUpperCase()).width),
+          tot = wd.reduce((a, b) => a + b, 0) + sp * (c.length - 1);
+        const fit = Math.min(1, 1160 / tot),
+          pop = 1 + 0.05 * Math.max(0, 1 - (lt - c[0][1]) / 0.12);
+        ctx.save();
+        ctx.translate(640, 648);
+        ctx.scale(fit * pop, fit * pop);
+        let x = -tot / 2;
+        const col = sh.sp === "ELI" ? "#ffffff" : "#ffe27a";
+        c.forEach((w, i) => {
+          const s = w[0].toUpperCase(),
+            on = lt >= w[1];
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.lineJoin = "round";
+          ctx.shadowColor = "rgba(255,170,200,.75)";
+          ctx.shadowBlur = 18;
+          ctx.lineWidth = 11;
+          ctx.strokeStyle = "#17110f";
+          ctx.strokeText(s, x, 0);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = on ? col : "rgba(255,255,255,.55)";
+          ctx.fillText(s, x, 0);
+          x += wd[i] + sp;
+        });
+        ctx.restore();
+      }
+      function dayTag(sh, t) {
+        if (!sh.day) return;
+        const first = TL.shots.find((s) => s.day === sh.day),
+          k = t - first.start,
+          sc = 1 + 0.5 * Math.max(0, 1 - k / 0.35);
+        ctx.save();
+        ctx.translate(40, 50);
+        ctx.scale(sc, sc);
+        ctx.font = "900 40px Inter";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = "#17110f";
+        ctx.strokeText("DAY " + sh.day, 0, 0);
+        ctx.fillStyle = "#e7432f";
+        ctx.fillText("DAY " + sh.day, 0, 0);
+        ctx.restore();
+        ctx.fillStyle = "rgba(23,17,15,.6)";
+        ctx.fillRect(40, 82, 150, 7);
+        ctx.fillStyle = "#e7432f";
+        ctx.fillRect(40, 82, (150 * sh.day) / 30, 7);
+      }
+      // ---------- main ----------
+      let TL = null,
+        BO = 0;
+      function render(t) {
+        TT = t;
+        BO = Math.floor(t * 8);
+        let sh = TL.shots[0];
+        for (const s of TL.shots) {
+          if (t >= s.start) sh = s;
+          else break;
+        }
+        SH = sh;
+        sh._glow = null;
+        const lt = clamp(t - sh.start, 0, sh.dur),
+          u = lt / sh.dur,
+          o = sh.o;
+        LT = lt;
+        srand(1000 + BO * 7919);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, W, H);
+        ctx.save();
+        let z =
+            o.cam === "in"
+              ? lerp(1, 1.12, ease(u))
+              : o.cam === "out"
+                ? lerp(1.12, 1, ease(u))
+                : lerp(1.02, 1.05, u),
+          sx = 0,
+          sy = 0;
+        if (o.shake && lt < 1.4) {
+          const a = 14 * (1 - lt / 1.4);
+          sx = (rnd() - 0.5) * a;
+          sy = (rnd() - 0.5) * a;
+        }
+        ctx.translate(W / 2 + sx, H * 0.55 + sy);
+        ctx.scale(z, z);
+        ctx.translate(-W / 2, -H * 0.55);
+        const r = BG[sh.bg](sh, t, lt);
+        const list = drawZ(sh, t, lt, r);
+        if (o.rain && sh.bg !== "window") rain(t);
+        let dark = o.dark || 0;
+        if (o.darkin) {
+          dark = lt > 1.0 ? o.darkin : 0;
+        }
+        if (dark) {
+          ctx.fillStyle = `rgba(8,8,26,${dark})`;
+          ctx.fillRect(-50, -50, W + 100, H + 100);
+        }
+        if (sh._glow) {
+          ctx.fillStyle = sh._glow[0];
+          ctx.fillRect(...sh._glow.slice(1));
+        }
+        if (o.cone) {
+          const h = list.find((p) => p.item === "flash");
+          if (h) {
+            const hx = h.x + 0.3 * h.s,
+              hy = h.y - 1.86 * h.s;
+            ctx.fillStyle = "rgba(2,2,10,.66)";
+            ctx.beginPath();
+            ctx.rect(-50, -50, W + 100, H + 100);
+            ctx.moveTo(hx, hy - 10);
+            ctx.lineTo(hx + 900, hy - 190);
+            ctx.lineTo(hx + 900, hy + 420);
+            ctx.lineTo(hx, hy + 20);
+            ctx.fill("evenodd");
+            const g = ctx.createLinearGradient(hx, 0, hx + 800, 0);
+            g.addColorStop(0, "rgba(255,240,190,.22)");
+            g.addColorStop(1, "rgba(255,240,190,0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(hx, hy - 10);
+            ctx.lineTo(hx + 900, hy - 190);
+            ctx.lineTo(hx + 900, hy + 420);
+            ctx.lineTo(hx, hy + 20);
+            ctx.fill();
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            for (const p of list) if (p.x < hx) person(p);
+            ctx.restore();
+          }
+        }
+        if (o.flash) {
+          const ft = [0.15, 0.32, 2.4].map((a) =>
+            Math.max(0, 1 - Math.abs(lt - a) / 0.09),
+          );
+          const f = Math.max(...ft);
+          if (f > 0) {
+            ctx.fillStyle = `rgba(235,240,255,${0.7 * f})`;
+            ctx.fillRect(-50, -50, W + 100, H + 100);
+          }
+        }
+        ctx.restore();
+        const vg = ctx.createRadialGradient(
+          W / 2,
+          H / 2,
+          H * 0.4,
+          W / 2,
+          H / 2,
+          H * 0.98,
+        );
+        vg.addColorStop(0, "rgba(0,0,0,0)");
+        vg.addColorStop(1, "rgba(12,6,20,.5)");
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, 0, W, H);
+        srand(BO * 13 + 5);
+        ctx.globalAlpha = 0.045;
+        for (let i = 0; i < 500; i++) {
+          ctx.fillStyle = rnd() > 0.5 ? "#fff" : "#000";
+          ctx.fillRect(rnd() * W, rnd() * H, 2, 2);
+        }
+        ctx.globalAlpha = 1;
+        dayTag(sh, t);
+        subs(sh, lt);
+        let fade = 0;
+        if (lt < 0.14) fade = 0.55 * (1 - lt / 0.14);
+        if (t < 0.5) fade = 1 - t / 0.5;
+        if (t > TL.total - 1) fade = clamp((t - (TL.total - 1)) / 0.9, 0, 1);
+        if (fade > 0) {
+          ctx.fillStyle = `rgba(0,0,0,${fade})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+      window.setTL = (tl) => {
+        TL = tl;
+      };
+      window.render = render;
+      document.fonts.load("900 50px Inter").then(() => {
+        window.ready = true;
+      });
+    </script>
+  </body>
+</html>
