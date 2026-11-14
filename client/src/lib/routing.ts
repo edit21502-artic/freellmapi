@@ -424,6 +424,7 @@ export const platformColors: Record<string, string> = {
   speka:       '#0d9488',
   kenari:      '#d97706',
   kiosapi:     '#15803d',
+  powertokens: '#f59e0b',
   typhoon:     '#e11d48',
   plugsky:     '#0284c7',
   inferbase:   '#2563eb',

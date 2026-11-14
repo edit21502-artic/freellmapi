@@ -59,6 +59,7 @@ const PLATFORMS = [
   'speka',
   'kenari',
   'kiosapi',
+  'powertokens',
   'typhoon',
   'plugsky',
   'inferbase',

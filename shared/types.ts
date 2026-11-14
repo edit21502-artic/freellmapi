@@ -75,6 +75,8 @@ export type Platform =
   // Named free chat/image routes share one renewable daily account allowance.
   | 'kenari'
   | 'kiosapi'
+  // OpenAI-compatible gateway (sk-pt- keys).
+  | 'powertokens'
   // Decision-only JEV adapter; promotional availability is catalog-managed.
   | 'beatapi'
   // Free-category chat and decisions share one weighted daily allowance.
