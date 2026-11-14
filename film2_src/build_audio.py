@@ -8,9 +8,10 @@ SR = 24000
 GAP = float(os.environ.get('GAP', '0.45'))
 SPEED = float(os.environ.get('SPEED', '0.9'))
 KD = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'kokoro')
-VOICE = dict(ELI=('am_michael', .97), HERO=('am_michael', 1.06), BEN=('am_liam', 1.05), BOSS=('am_onyx', .8), LEO=('am_puck', 1.05), FRANK=('am_fenrir', 1.05), PA=('am_eric', .95))
+VOICE = dict(ELI=('am_michael', .97), HERO=('am_michael', 1.06), BEN=('am_liam', 1.05), BOSS=('am_onyx', .8), LEO=('am_puck', 1.05), FRANK=('am_fenrir', 1.05), PA=('am_eric', .95), DAD=('am_adam', 1.0), ANCHOR=('am_eric', 1.0), SOLDIER=('am_echo', 1.05))
 rng = np.random.default_rng(7)
 RADIO_ON = False
+CUR = None
 
 def bandpass(x, lo, hi):
     X = np.fft.rfft(x); f = np.fft.rfftfreq(len(x), 1 / SR)
@@ -135,6 +136,8 @@ def sfx(name):
     raise KeyError(name)
 
 def voice_fx(sp, a):
+    if sp == 'DAD' and CUR['bg'] != 'phone': return a
+    if sp == 'SOLDIER' and CUR['bg'] == 'radio': sp = 'RADIO'
     if sp == 'DAD': return bandpass(a, 350, 3200) * 1.6
     if sp in ('RADIO', 'PA') or (sp == 'FRANK' and RADIO_ON):
         x = bandpass(a, 400, 2800) * 2.0; x = np.tanh(x * 3) / 2.2
@@ -159,6 +162,7 @@ def main():
         if os.path.exists(fn): a, _ = sf.read(fn, dtype='float32')
         else:
             a, sr = k.create(sh['text'], voice=v, speed=spd, lang='en-us'); a = trim(a.astype(np.float32)); sf.write(fn, a, SR)
+        global CUR; CUR = sh
         global RADIO_ON; RADIO_ON = 'radio' in ' '.join(sh['o'].get('a', [])) and sh['bg'] == 'stairs' and sh['sp'] == 'FRANK'
         a = voice_fx(sh['sp'], a)
         pre = sh['o'].get('pre', 0.2); vd = len(a) / SR; dur = pre + vd + sh['o'].get('gap', GAP)

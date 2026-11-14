@@ -16,6 +16,7 @@ const CL2 = {
   leo: "#d8b04c",
   zleo: "#d8b04c",
   frank: "#2f3a55",
+  soldier: "#4d5a3a",
   biter: "#3b3f55",
 };
 person = function (o) {
@@ -342,7 +343,7 @@ person = function (o) {
       );
       E(d[0], d[1], 0.012 * s, 0.02 * s, "#9fc0dd");
     }
-  } else if (k === "frank") {
+  } else if (k === "frank" || k === "soldier") {
     ctx.beginPath();
     ctx.arc(hc[0], hc[1] - 0.04 * s, r * 1.06, Math.PI, 0);
     ctx.closePath();
