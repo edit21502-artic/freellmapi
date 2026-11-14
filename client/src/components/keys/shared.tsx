@@ -34,7 +34,6 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
   { value: 'kenari', label: 'Kenari (shared daily free chat and images)', url: 'https://kenari.id' },
   { value: 'kiosapi', label: 'KiosAPI (shared daily free chat)', url: 'https://kiosapi.id/dashboard/keys' },
-  { value: 'powertokens', label: 'PowerTokens', url: 'https://powertokens.ai' },
   { value: 'beatapi', label: 'BeatAPI (JEV decisions; temporary free offer)', url: 'https://beatapi.io' },
   { value: 'apinex', label: 'APINex (shared daily free chat and decisions)', url: 'https://apinex.bond/keys' },
   { value: 'onomeo', label: 'onomeo (30 free calls / 5 hours, shared)', url: 'https://onomeo.com/dashboard' },
