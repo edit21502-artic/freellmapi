@@ -101,6 +101,25 @@ def frame(i):
     # palms
     palm(d, 120, HORIZON + 40, 1.25, 1)
     palm(d, 960, HORIZON + 60, 1.05, -1)
+    # image card with ken burns + slide-in
+    pic = PICS.get(sec[0])
+    if pic is not None:
+        nxt = [s[0] for s in SECTIONS if s[0] > sec[0]]
+        slen = (nxt[0] if nxt else DUR) - sec[0]
+        z = 1.0 + 0.15 * (st / slen)
+        cw, ch = 1000, 562
+        pw, ph = pic.size
+        vw, vh = pw / z, ph / z
+        ox = (pw - vw) * (0.5 + 0.3 * math.sin(st * 0.4)); oy = (ph - vh) / 2
+        card = pic.crop((int(ox), int(oy), int(ox + vw), int(oy + vh))).resize((cw, ch), Image.BILINEAR)
+        slide = int(1200 * (1 - ease(st / 0.45)))
+        x0, y0 = (W - cw) // 2 + slide, 1000 - ch // 2
+        glowl = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(glowl).rounded_rectangle([x0 - 18, y0 - 18, x0 + cw + 18, y0 + ch + 18], 30, fill=255)
+        img.paste(col, (0, 0), glowl.filter(ImageFilter.GaussianBlur(25)))
+        m = Image.new("L", (cw, ch), 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, cw, ch], 24, fill=255)
+        d.rounded_rectangle([x0 - 8, y0 - 8, x0 + cw + 8, y0 + ch + 8], 30, fill=(255, 255, 255))
+        img.paste(card, (x0, y0), m)
     # camera punch / shake on section change
     punch = max(0, 1 - st / 0.35)
     # big number / keyword
@@ -142,6 +161,10 @@ def frame(i):
         s = int(12 * punch)
         a[:, :, 0] = np.roll(a[:, :, 0], s, 1); a[:, :, 2] = np.roll(a[:, :, 2], -s, 1)
     return np.clip(a, 0, 255).astype(np.uint8)
+
+import os
+_MAP = {0.0: "swamp", 3.34: "swamp", 15.08: "couple", 26.28: "views", 34.19: "ps5", 42.66: "money", 53.12: "ps5"}
+PICS = {k: Image.open(f"img/{v}.png").convert("RGB") for k, v in _MAP.items() if os.path.exists(f"img/{v}.png")}
 
 yy, xx = np.mgrid[0:H, 0:W]
 VIG = (1 - 0.55 * (((xx - W / 2) / (W / 1.2)) ** 2 + ((yy - H / 2) / (H / 1.2)) ** 2))[..., None].astype(np.float32)
