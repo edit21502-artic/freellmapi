@@ -1118,7 +1118,7 @@ BG.studio = function (sh, t, lt) {
     ctx.shadowColor = "#ff3fa0";
     ctx.shadowBlur = 30;
     tx(
-      "FIVE RULES",
+      "10 RULES",
       980,
       80,
       46,
@@ -2103,54 +2103,16 @@ BG.law = function (sh, t, lt) {
   var g = clamp(lt, 0, 5), ang = g < .5 ? lerp(-.9, .05, ease(g / .5)) : .05; ctx.save(); ctx.translate(1110, 180); ctx.rotate(ang); rr(-12, 0, 24, 170, 8, '#8a5a3c', OUT, 5); rr(-70, -34, 140, 60, 12, '#a8723f', OUT, 5); ctx.restore(); rr(1020, 370, 200, 30, 8, '#8a5a3c', OUT, 5);
   return { gy: 2000, s: 100 };
 };
-// ===== film 6: five rules overrides =====
-FT = {
-  1: "STOP CHECKING YOUR PHONE",
-  2: "KNOW TWO WAYS OUT",
-  3: "PICK ONE LEADER",
-  4: "NO SHOPPING, FIRST HOUR",
-  5: "ONE PERSON YOU TRUST",
-};
-// countdown board with 5 rows instead of 10
+// ===== film 6: ten rules overrides =====
+FT = { 1: 'STOP CHECKING YOUR PHONE', 2: 'KNOW TWO WAYS OUT', 3: 'PICK ONE LEADER', 4: 'NO SHOPPING, FIRST HOUR', 5: 'ONE PERSON YOU TRUST', 6: 'WATER BEFORE FOOD', 7: 'QUIET BEATS FAST', 8: 'SLEEP IN SHIFTS', 9: 'WRITE IT ON PAPER', 10: 'KNOW WHEN TO LEAVE' };
 board = function (c, x0, y0, w, h) {
-  rr(x0 - 14, y0 - 14, w + 28, h + 28, 14, "#8a5a3c", OUT, 6);
-  rr(x0, y0, w, h, 6, "#27403a");
-  tx("5 RULES", x0 + w / 2, y0 + 40, 36, "#f4f1e6");
-  ln([x0 + 30, y0 + 66, x0 + w - 30, y0 + 66], 3, "rgba(244,241,230,.5)");
-  for (var n = 5; n >= 1; n--) {
-    var y = y0 + 128 + (5 - n) * 78,
-      shown = n >= c,
-      cur = n === c;
-    if (cur) {
-      rr(x0 + 14, y - 30, w - 28, 60, 10, "rgba(255,217,46,.24)");
-      glow(
-        x0 + w / 2,
-        y,
-        240,
-        "rgba(255,217,46,.35)",
-        0.5 + 0.3 * Math.sin(TT * 5),
-      );
-    }
-    tx(
-      String(n),
-      x0 + 44,
-      y,
-      40,
-      cur ? "#ffd92e" : shown ? "#f4f1e6" : "#7f9a90",
-    );
-    tx(
-      shown ? FT[n] : "?????",
-      x0 + 86,
-      y,
-      24,
-      cur ? "#ffd92e" : shown ? "#f4f1e6" : "#6f8a80",
-      "left",
-    );
-    if (shown && !cur)
-      ln(
-        [x0 + w - 56, y + 1, x0 + w - 47, y + 10, x0 + w - 30, y - 10],
-        6,
-        "#5ad17a",
-      );
+  rr(x0 - 14, y0 - 14, w + 28, h + 28, 14, '#8a5a3c', OUT, 6); rr(x0, y0, w, h, 6, '#27403a');
+  tx('10 RULES', x0 + w / 2, y0 + 34, 34, '#f4f1e6'); ln([x0 + 30, y0 + 58, x0 + w - 30, y0 + 58], 3, 'rgba(244,241,230,.5)');
+  for (var n = 1; n <= 10; n++) {
+    var y = y0 + 92 + (n - 1) * 38.4, shown = n <= c, cur = n === c;
+    if (cur) { rr(x0 + 14, y - 18, w - 28, 36, 8, 'rgba(255,217,46,.24)'); glow(x0 + w / 2, y, 240, 'rgba(255,217,46,.35)', .5 + .3 * Math.sin(TT * 5)) }
+    tx(String(n), x0 + 44, y, 28, cur ? '#ffd92e' : (shown ? '#f4f1e6' : '#7f9a90'));
+    tx(shown ? FT[n] : '?????', x0 + 80, y, 22, cur ? '#ffd92e' : (shown ? '#f4f1e6' : '#6f8a80'), 'left');
+    if (shown && !cur) ln([x0 + w - 56, y + 1, x0 + w - 47, y + 9, x0 + w - 30, y - 9], 5, '#5ad17a');
   }
 };
