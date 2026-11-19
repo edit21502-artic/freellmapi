@@ -1,0 +1,35 @@
+const { chromium } = require("playwright"); const fs = require("fs");
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
+  p.on("pageerror", e => console.log("ERR", e.message));
+  await p.goto("file://" + __dirname + "/engine.html"); await p.waitForFunction("window.ready");
+  await p.evaluate(() => document.fonts.ready);
+  const out = await p.evaluate(() => {
+    const K = 1.5, PW = 1920, PH = 1080; cv.width = PW; cv.height = PH; TT = 2.26; BO = 3; LT = 1;
+    const mk = (pal, o) => ({ pal, day: "", sp: "ELI", o, i: 0, dur: 5, words: [] });
+    const grab = () => { const c = document.createElement("canvas"); c.width = PW; c.height = PH; c.getContext("2d").drawImage(cv,0,0); return c; };
+    const bg = (o) => { ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,PW,PH); ctx.setTransform(K,0,0,K,0,0); SH = mk("night", o); BG.hall(SH, 2.26, 1); return grab(); };
+    const chars = (fn) => { ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,PW,PH); fn(); return grab(); };
+    const A = bg({ lit: 1 }), B = bg({ dark: .55 });
+    const plaque = (x) => { ctx.save(); rr(x-70, 150, 140, 64, 10, "#d8b45a", OUT, 6); ctx.font = "900 44px Inter"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#2a1f10"; ctx.fillText("617", x, 184); ctx.restore(); };
+    const CA = chars(() => { plaque(520);
+      ch({ k: "eli", x: 230, y: 1000, s: 360, f: 1 });
+      ch({ k: "maid", x: 760, y: 1000, s: 340, f: -1 }); });
+    const CB = chars(() => { plaque(1440);
+      for (const [x, s, c] of [[1150,270,3],[1700,280,5],[1290,250,6],[1820,260,4],[1580,240,7]]) ch({ k: c%2 ? "zpax" : "zcrew", x, y: 975, s, f: x < 1440 ? 1 : -1, ci: c, arm: "up" });
+      ch({ k: "zmaid", x: 1440, y: 1010, s: 360, f: -1, arm: "up" });
+      ctx.save(); ctx.translate(1180, 1030); ctx.rotate(.22); rr(-80, -42, 160, 84, 8, "#f3efe2", OUT, 5); ctx.font = "900 26px Inter"; ctx.textAlign = "center"; ctx.fillStyle = "#9a2530"; ctx.fillText("DO NOT", 0, -6); ctx.fillText("DISTURB", 0, 24); ctx.restore(); });
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,PW,PH);
+    ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(1010,0); ctx.lineTo(910,PH); ctx.lineTo(0,PH); ctx.clip();
+    ctx.drawImage(A, -560, 0); ctx.drawImage(CA, 0, 0); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.moveTo(1010,0); ctx.lineTo(PW,0); ctx.lineTo(PW,PH); ctx.lineTo(910,PH); ctx.clip();
+    ctx.drawImage(B, 360, 0); ctx.drawImage(B, -1500, 0); ctx.fillStyle = "rgba(30,10,40,.25)"; ctx.fillRect(0,0,PW,PH); ctx.drawImage(CB, 0, 0); ctx.restore();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(1010,-5); ctx.lineTo(910,PH+5); ctx.stroke();
+    const label = (s, x, y, sz, c) => { ctx.save(); ctx.font = "900 "+sz+"px Inter"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+      ctx.lineWidth = sz*.2; ctx.strokeStyle = "#141520"; ctx.strokeText(s,x,y); ctx.fillStyle = c; ctx.fillText(s,x,y); ctx.restore(); };
+    label("DAY 1", 40, 95, 140, "#ffffff");
+    label("DAY 30", 1300, 95, 140, "#e8352b");
+    return cv.toDataURL("image/png");
+  });
+  fs.writeFileSync("/home/user/freellmapi/thumb_room_617_v2.png", Buffer.from(out.split(",")[1], "base64")); await b.close();
+})();
