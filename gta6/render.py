@@ -1,32 +1,32 @@
 import math, subprocess, numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-W, H, FPS, DUR = 1080, 1920, 30, 56.0
+W, H, FPS, DUR = 1080, 1920, 30, 59.0
 FB = "/usr/share/fonts/opentype/inter/Inter-ExtraBold.otf"
 font = lambda s: ImageFont.truetype(FB, s)
 
 SECTIONS = [  # start, number, keyword, color
     (0.0, None, "GTA VI", (255, 80, 200)),
-    (3.34, 5, "LEONIDA", (255, 150, 60)),
-    (15.08, 4, "LUCIA", (255, 70, 150)),
-    (26.28, 3, "90M VIEWS", (80, 220, 255)),
-    (34.19, 2, "PS5", (120, 160, 255)),
-    (42.66, 1, "BILLIONS", (255, 210, 60)),
-    (53.12, None, "FOLLOW", (255, 80, 200)),
+    (3.27, 5, "LEONIDA", (255, 150, 60)),
+    (15.39, 4, "LUCIA", (255, 70, 150)),
+    (27.48, 3, "90M VIEWS", (80, 220, 255)),
+    (35.35, 2, "PS5", (120, 160, 255)),
+    (44.43, 1, "BILLIONS", (255, 210, 60)),
+    (56.38, None, "FOLLOW", (255, 80, 200)),
 ]
 CAPS = [
-    (0.0, 2.94, "5 GTA 6 FACTS|YOU DIDN'T KNOW"),
-    (4.52, 6.79, "NOT JUST|VICE CITY"),
-    (7.24, 11.17, "A WHOLE STATE|INSPIRED BY FLORIDA"),
-    (11.46, 14.63, "SWAMPS, BEACHES|& SMALL TOWNS"),
-    (16.23, 20.41, "FIRST FEMALE LEAD|IN MODERN GTA"),
-    (21.77, 25.83, "LUCIA & JASON|BONNIE AND CLYDE VIBES"),
-    (27.32, 33.79, "~90 MILLION VIEWS|IN 24 HOURS"),
-    (35.17, 39.37, "TRAILER 2 CAPTURED|ON PS5"),
-    (39.86, 42.18, "IN-GAME|NOT PRE-RENDERED"),
-    (43.95, 48.59, "GTA 5 MADE|BILLIONS"),
-    (49.17, 52.84, "BIGGEST SHOES|IN GAMING HISTORY"),
-    (53.83, 56.0, "FOLLOW FOR MORE|GTA 6 FACTS"),
+    (0.0, 2.99, "5 GTA 6 FACTS|YOU DIDN'T KNOW"),
+    (4.8, 7.32, "NOT JUST|VICE CITY"),
+    (7.6, 11.53, "A WHOLE STATE|INSPIRED BY FLORIDA"),
+    (11.81, 15.11, "SWAMPS, BEACHES|& SMALL TOWNS"),
+    (16.91, 21.6, "FIRST FEMALE LEAD|IN MODERN GTA"),
+    (21.88, 27.2, "LUCIA & JASON|BONNIE AND CLYDE VIBES"),
+    (28.97, 35.07, "~90 MILLION VIEWS|IN 24 HOURS"),
+    (36.83, 41.48, "TRAILER 2 CAPTURED|ON PS5"),
+    (41.76, 44.15, "IN-GAME|NOT PRE-RENDERED"),
+    (46.05, 51.32, "GTA 5 MADE|BILLIONS"),
+    (51.6, 56.1, "BIGGEST SHOES|IN GAMING HISTORY"),
+    (56.38, 59.0, "FOLLOW FOR MORE|GTA 6 FACTS"),
 ]
 
 # static sunset gradient
@@ -163,7 +163,7 @@ def frame(i):
     return np.clip(a, 0, 255).astype(np.uint8)
 
 import os
-_MAP = {0.0: "swamp", 3.34: "swamp", 15.08: "couple", 26.28: "views", 34.19: "ps5", 42.66: "money", 53.12: "ps5"}
+_MAP = {0.0: "swamp", 3.27: "swamp", 15.39: "couple", 27.48: "views", 35.35: "ps5", 44.43: "money", 56.38: "ps5"}
 PICS = {k: Image.open(f"img/{v}.png").convert("RGB") for k, v in _MAP.items() if os.path.exists(f"img/{v}.png")}
 
 yy, xx = np.mgrid[0:H, 0:W]
