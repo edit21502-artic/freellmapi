@@ -103,15 +103,19 @@ def frame(i):
     palm(d, 960, HORIZON + 60, 1.05, -1)
     # image card with ken burns + slide-in
     pic = PICS.get(sec[0])
-    if pic is not None:
+    gen = CODE_CARDS.get(sec[1])
+    if pic is not None or gen is not None:
         nxt = [s[0] for s in SECTIONS if s[0] > sec[0]]
         slen = (nxt[0] if nxt else DUR) - sec[0]
-        z = 1.0 + 0.15 * (st / slen)
         cw, ch = 1000, 562
-        pw, ph = pic.size
-        vw, vh = pw / z, ph / z
-        ox = (pw - vw) * (0.5 + 0.3 * math.sin(st * 0.4)); oy = (ph - vh) / 2
-        card = pic.crop((int(ox), int(oy), int(ox + vw), int(oy + vh))).resize((cw, ch), Image.BILINEAR)
+        if gen is not None:
+            card = gen(st, slen)
+        else:
+            z = 1.0 + 0.15 * (st / slen)
+            pw, ph = pic.size
+            vw, vh = pw / z, ph / z
+            ox = (pw - vw) * (0.5 + 0.3 * math.sin(st * 0.4)); oy = (ph - vh) / 2
+            card = pic.crop((int(ox), int(oy), int(ox + vw), int(oy + vh))).resize((cw, ch), Image.BILINEAR)
         slide = int(1200 * (1 - ease(st / 0.45)))
         x0, y0 = (W - cw) // 2 + slide, 1000 - ch // 2
         glowl = Image.new("L", (W, H), 0)
@@ -165,6 +169,108 @@ def frame(i):
 import os
 _MAP = {0.0: "swamp", 3.27: "swamp", 15.39: "couple", 27.48: "views", 35.35: "ps5", 44.43: "money", 56.38: "ps5"}
 PICS = {k: Image.open(f"img/{v}.png").convert("RGB") for k, v in _MAP.items() if os.path.exists(f"img/{v}.png")}
+
+import random
+CW, CH = 1000, 562
+
+def _bg(top, bot):
+    g = np.linspace(0, 1, CH)[:, None, None]
+    a = (np.array(top) * (1 - g) + np.array(bot) * g).repeat(CW, 1).astype(np.uint8)
+    return Image.fromarray(a)
+
+_rng = random.Random(7)
+STARS = [(_rng.randrange(CW), _rng.randrange(260), _rng.random()) for _ in range(70)]
+
+def card_couple(st, slen):
+    im = _bg((8, 4, 30), (60, 10, 70)); d = ImageDraw.Draw(im)
+    for x, y, p in STARS:
+        b = int(150 + 100 * math.sin(st * 3 + p * 9)); d.point((x, y), fill=(b, b, b))
+    d.rectangle([0, 430, CW, CH], fill=(20, 10, 30))
+    # motel sign
+    on = (int(st * 4) % 7) != 0
+    sc = (255, 60, 160) if on else (90, 30, 60)
+    d.rectangle([640, 60, 660, 430], fill=(30, 20, 40))
+    d.rounded_rectangle([540, 70, 900, 190], 18, outline=sc, width=8)
+    f = font(78)
+    glow = Image.new("RGBA", im.size, (0, 0, 0, 0)); gd = ImageDraw.Draw(glow)
+    gd.text((575, 85), "MOTEL", font=f, fill=sc + (255,))
+    if on:
+        im.paste(sc, (0, 0), glow.split()[3].filter(ImageFilter.GaussianBlur(14)))
+    d.text((575, 85), "MOTEL", font=f, fill=(255, 220, 240) if on else sc)
+    d.text((610, 205), "VACANCY", font=font(40), fill=(80, 230, 255) if (int(st * 2) % 2) else (30, 80, 100))
+    # car silhouette
+    cx = 80 - int(60 * (1 - ease(st / 1.2)))
+    d.polygon([(cx, 470), (cx + 40, 420), (cx + 140, 400), (cx + 260, 400), (cx + 330, 430), (cx + 420, 440), (cx + 430, 480), (cx, 485)], fill=(5, 0, 12))
+    for wx in (cx + 85, cx + 340):
+        d.ellipse([wx - 35, 450, wx + 35, 520], fill=(5, 0, 12)); d.ellipse([wx - 15, 470, wx + 15, 500], fill=(80, 60, 100))
+    d.line([(cx + 420, 455), (cx + 432, 455)], fill=(255, 240, 180), width=8)
+    # two figures back to back
+    sway = int(4 * math.sin(st * 2))
+    def person(x, hair):
+        d.ellipse([x - 26, 230 + sway, x + 26, 285 + sway], fill=(5, 0, 12))
+        if hair:
+            d.polygon([(x - 28, 250 + sway), (x + 28, 250 + sway), (x + 34, 320), (x - 34, 320)], fill=(5, 0, 12))
+        d.polygon([(x - 45, 290), (x + 45, 290), (x + 38, 400), (x - 38, 400)], fill=(5, 0, 12))
+        d.rectangle([x - 32, 400, x - 8, 500], fill=(5, 0, 12)); d.rectangle([x + 8, 400, x + 32, 500], fill=(5, 0, 12))
+    person(560, True); person(660, False)
+    # rim light
+    d.text((40, 30), "LUCIA + JASON", font=font(44), fill=(255, 120, 200))
+    return im
+
+def card_views(st, slen):
+    im = _bg((25, 5, 40), (90, 10, 60)); d = ImageDraw.Draw(im)
+    # chart
+    pts = []
+    prog = ease(st / (slen * 0.8))
+    for i in range(41):
+        x = 60 + i * 22
+        v = (i / 40) ** 2.4
+        if i / 40 <= prog:
+            pts.append((x, 500 - v * 380))
+    for gy in range(120, 501, 95):
+        d.line([(60, gy), (940, gy)], fill=(80, 40, 100), width=2)
+    if len(pts) > 1:
+        poly = pts + [(pts[-1][0], 500), (60, 500)]
+        layer = Image.new("RGBA", im.size, (0, 0, 0, 0)); ImageDraw.Draw(layer).polygon(poly, fill=(255, 40, 80, 90))
+        im.paste(layer, (0, 0), layer); d = ImageDraw.Draw(im)
+        d.line(pts, fill=(255, 60, 110), width=9, joint="curve")
+        ex, ey = pts[-1]; r = 14 + 4 * math.sin(st * 10)
+        d.ellipse([ex - r, ey - r, ex + r, ey + r], fill=(255, 255, 255))
+    n = int(90_000_000 * ease(st / (slen * 0.75)))
+    d.text((60, 30), f"{n:,}", font=font(96), fill=(255, 255, 255), stroke_width=6, stroke_fill=(150, 0, 60))
+    d.text((66, 140), "VIEWS IN 24 HOURS", font=font(40), fill=(255, 200, 80))
+    # play button
+    px, py = 860, 90 + int(8 * math.sin(st * 4))
+    d.rounded_rectangle([px - 70, py - 48, px + 70, py + 48], 26, fill=(255, 30, 60))
+    d.polygon([(px - 20, py - 26), (px - 20, py + 26), (px + 28, py)], fill=(255, 255, 255))
+    return im
+
+BILLS = [(_rng.randrange(-40, CW), _rng.uniform(0, 1), _rng.uniform(0.6, 1.4), _rng.uniform(-30, 30)) for _ in range(26)]
+
+def card_money(st, slen):
+    im = _bg((10, 30, 15), (40, 70, 20)); d = ImageDraw.Draw(im)
+    # bars
+    vals = [0.25, 0.4, 0.55, 0.75, 1.0]
+    for i, v in enumerate(vals):
+        h = 330 * v * ease((st - i * 0.25) / 0.8)
+        x = 520 + i * 90
+        d.rectangle([x, 520 - h, x + 60, 520], fill=(255, 210, 60), outline=(255, 250, 200), width=3)
+    d.line([(500, 520), (980, 520)], fill=(255, 255, 255), width=4)
+    # falling bills
+    for x, ph, sp, ang in BILLS:
+        y = ((ph + st * 0.22 * sp) % 1.2) * (CH + 120) - 120
+        bill = Image.new("RGBA", (110, 52), (0, 0, 0, 0)); bd = ImageDraw.Draw(bill)
+        bd.rounded_rectangle([0, 0, 109, 51], 6, fill=(110, 190, 90), outline=(30, 90, 30), width=3)
+        bd.ellipse([38, 9, 72, 43], outline=(30, 90, 30), width=3); bd.text((47, 9), "$", font=font(30), fill=(30, 90, 30))
+        bill = bill.rotate(ang + st * 40 * sp, expand=True)
+        im.paste(bill, (int(x + 20 * math.sin(st * sp * 2)), int(y)), bill)
+    d = ImageDraw.Draw(im)
+    d.text((40, 40), "GTA V", font=font(70), fill=(255, 255, 255), stroke_width=5, stroke_fill=(0, 60, 0))
+    d.text((40, 130), "$ BILLIONS", font=font(96), fill=(255, 215, 60), stroke_width=6, stroke_fill=(80, 50, 0))
+    d.text((44, 250), "ONE OF THE BEST-SELLING\nGAMES OF ALL TIME", font=font(34), fill=(220, 255, 220))
+    return im
+
+CODE_CARDS = {4: card_couple, 3: card_views, 1: card_money}
 
 yy, xx = np.mgrid[0:H, 0:W]
 VIG = (1 - 0.55 * (((xx - W / 2) / (W / 1.2)) ** 2 + ((yy - H / 2) / (H / 1.2)) ** 2))[..., None].astype(np.float32)
