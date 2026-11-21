@@ -35,16 +35,15 @@ BG.box = function (sh, t, lt) {
 LOOK.soldier = { skin: "#9a6a4a", top: "#4d5a3a", bot: "#3a4230", hair: "#1a1a1a", hs: "buzz" };
 LOOK.june = { skin: "#e2b08c", top: "#3f7fb5", bot: "#3f7fb5", hair: "#5a3a22", hs: "short" };
 LOOK.pilot = { skin: "#c08a64", top: "#4d5a3a", bot: "#3a4230", hair: "#1a1a1a", hs: "buzz" };
-// ---- hero glow ----
+// ---- hero glow: thin warm rim + faint halo ----
 (function () {
   var _ch = ch;
   ch = function (o) {
     if (o && o.k === "eli" && !o.noglow) {
       var s = o.s || 100;
-      ctx.save();
-      glow(o.x, o.y - s * 0.75, s * 0.95, "rgba(150,230,255,.55)", .55 + .12 * Math.sin(TT * 3));
-      ctx.shadowColor = "rgba(190,245,255,.95)"; ctx.shadowBlur = Math.max(10, s * 0.13);
-      _ch(o); ctx.restore(); return;
+      glow(o.x, o.y - s * 0.7, s * 0.75, "rgba(255,214,90,.22)", 1);
+      ctx.save(); ctx.shadowColor = "rgba(255,210,70,.95)"; ctx.shadowBlur = Math.max(6, s * 0.06); _ch(o); ctx.restore();
+      return _ch(o);
     }
     return _ch(o);
   };
@@ -150,4 +149,47 @@ BG.hroof = function (sh, t, lt) {
     tx("RESCUE", hx - 20, hy + 6, 22, "#c0392b");
   }
   return r;
+};
+
+BG.supply = function (sh, t, lt) {
+  var o = sh.o;
+  gr(0, 0, W, 600, "#c9d6d2", "#a9bab5"); gr(0, 600, W, 120, "#8d9c9a", "#66767a"); ln([0, 600, W, 600], 6, OUT);
+  rr(560, 20, 160, 16, 6, "#f8fbff", OUT, 3); glow(640, 60, 380, "rgba(255,255,230,.35)", o.dark ? .2 : 1);
+  for (var r = 0; r < 4; r++) { ln([40, 150 + r * 110, 420, 150 + r * 110], 8, "#7d8a90");
+    for (var b = 0; b < 4; b++) rr(56 + b * 90, 86 + r * 110, 74, 60, 4, ["#e8ddc4", "#cfe3f0", "#f2f2f2", "#d9c8a8"][(r + b) % 4], OUT, 3); }
+  rr(560, 230, 330, 370, 14, "#c4ccd2", OUT, 6); rr(560, 230, 330, 70, 10, "#a9b3ba", OUT, 5);
+  tx("ICE", 725, 266, 34, "#2f6f8f"); rr(600, 340, 250, 150, 10, "#8f9aa2", OUT, 5);
+  for (var i = 0; i < 14; i++) rr(612 + (i % 7) * 33, 420 + Math.floor(i / 7) * 32, 28, 26, 6, "rgba(220,245,255,.95)", "#7fb0c8", 2);
+  rr(980, 470, 120, 130, 10, "#e8c14a", OUT, 5); ln([980, 500, 1100, 500], 4, OUT);
+  if (o.drip) for (var d = 0; d < 3; d++) { var yy = 490 + ((t * 120 + d * 40) % 110); el(700 + d * 40, yy, 5, 8, "rgba(140,200,240,.9)"); }
+  return { gy: 686, s: 178 };
+};
+BG.stair = function (sh, t, lt) {
+  var o = sh.o;
+  gr(0, 0, W, H, "#b9c6c2", "#8e9c99");
+  for (var i = 0; i < 9; i++) { var x = 200 + i * 100, y = 640 - i * 62; rr(x, y, 120, 70, 0, "#9aa8a5", OUT, 4); }
+  ln([180, 560, 1080, 30], 8, "#d8b45a"); for (var i = 0; i < 9; i++) ln([240 + i * 100, 560 - i * 62 - 40, 240 + i * 100, 640 - i * 62], 4, "#d8b45a");
+  rr(40, 200, 160, 400, 6, "#e9eef0", OUT, 5); rr(80, 240, 80, 100, 4, "#1d2638", OUT, 4);
+  rr(60, 120, 120, 50, 6, "#2f6f8f", OUT, 4); tx("STAIR B", 120, 145, 22, "#ffffff");
+  rr(1120, 80, 110, 40, 6, "#1b7a3a", OUT, 3); tx("EXIT", 1175, 100, 22, "#ffffff"); glow(1175, 100, 160, "rgba(80,255,120,.3)", 1);
+  if (o.roofup) { glow(1100, 40, 300, "rgba(255,200,120,.5)", 1); }
+  return { gy: 686, s: 168 };
+};
+BG.dwin = function (sh, t, lt) {
+  var o = sh.o;
+  gr(0, 0, W, H, "#e3e8ea", "#c9d0d4");
+  for (var i = 0; i < 6; i++) ln([0, 80 + i * 120, W, 80 + i * 120], 2, "rgba(0,0,0,.05)");
+  var x = 400, y = 90, w = 480, h = 520;
+  rr(x - 22, y - 22, w + 44, h + 44, 10, "#b9c2c8", OUT, 8);
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  gr(x, y, w, h, o.dark ? "#26304a" : "#cfe4da", o.dark ? "#141a2c" : "#a9c3b8");
+  ln([x, y + h * 0.62, x + w, y + h * 0.62], 6, "#7fa3a0");
+  if (o.cart) { rr(x + 40, y + h * 0.55, 160, 200, 8, "#3f7fb5", OUT, 5); for (var d = 0; d < 3; d++) rr(x + 52, y + h * 0.58 + d * 40, 136, 30, 4, ["#e85a4f", "#f2c21a", "#5ad17a"][d], OUT, 3); }
+  if (o.who) ch({ k: o.who, x: x + w * 0.62, y: y + h + 330, s: 520, f: -1, noglow: 1, arm: o.knock ? "up" : null });
+  if (o.dark) { ctx.fillStyle = "rgba(8,10,30,.35)"; ctx.fillRect(x, y, w, h); }
+  ctx.fillStyle = "rgba(255,255,255,.08)"; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 140, y); ctx.lineTo(x, y + 200); ctx.fill();
+  ctx.restore();
+  ln([x + w / 2, y, x + w / 2, y + h], 4, "rgba(40,40,60,.35)");
+  rr(x - 22, y - 22, w + 44, h + 44, 10, null, OUT, 8);
+  return { gy: 2000, s: 100 };
 };
