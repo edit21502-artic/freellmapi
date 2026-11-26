@@ -1,0 +1,671 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="st"></div>
+    <script>
+      const W = 1920,
+        H = 1080;
+      const rnd = (i) => {
+        const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+      const lerp = (a, b, k) => a + (b - a) * k;
+      const eo = (x) => 1 - Math.pow(1 - clamp(x), 3);
+      const eio = (x) => {
+        x = clamp(x);
+        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+      };
+      const back = (x) => {
+        x = clamp(x);
+        const c = 1.70158;
+        return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2);
+      };
+      const f = (n) => (+n).toFixed(2);
+      const FONT = `font-family="Inter" font-weight="900"`;
+
+      const DEFS = `<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b7fd6"/><stop offset=".45" stop-color="#ff9e7a"/><stop offset=".8" stop-color="#ffc977"/><stop offset="1" stop-color="#ffe3a0"/></linearGradient>
+<radialGradient id="sunG"><stop offset="0" stop-color="#fffbe0"/><stop offset=".25" stop-color="#ffe9a0" stop-opacity=".95"/><stop offset=".6" stop-color="#ffb46b" stop-opacity=".35"/><stop offset="1" stop-color="#ff8a5c" stop-opacity="0"/></radialGradient>
+<linearGradient id="wall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9b6a78"/><stop offset=".35" stop-color="#d6a08a"/><stop offset=".62" stop-color="#f7cf9e"/><stop offset="1" stop-color="#e9b48d"/></linearGradient>
+<linearGradient id="wallV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2050" stop-opacity=".35"/><stop offset=".5" stop-color="#3a2050" stop-opacity="0"/></linearGradient>
+<linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c07a52"/><stop offset="1" stop-color="#6e3f45"/></linearGradient>
+<linearGradient id="cab" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fb3a2"/><stop offset="1" stop-color="#1e7f7c"/></linearGradient>
+<linearGradient id="cabU" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#36bfae"/><stop offset="1" stop-color="#23948a"/></linearGradient>
+<linearGradient id="fridge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f2f5ff"/><stop offset="1" stop-color="#b9c2e0"/></linearGradient>
+<linearGradient id="ray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1b8" stop-opacity=".55"/><stop offset="1" stop-color="#ffd08a" stop-opacity="0"/></linearGradient>
+<linearGradient id="patch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe2a0" stop-opacity=".55"/><stop offset="1" stop-color="#ffc070" stop-opacity=".15"/></linearGradient>
+<radialGradient id="headG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#3b3352"/><stop offset=".45" stop-color="#15121f"/><stop offset="1" stop-color="#07060b"/></radialGradient>
+<radialGradient id="vig" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#1a0e2a" stop-opacity="0"/><stop offset="1" stop-color="#1a0e2a" stop-opacity=".55"/></radialGradient>
+<radialGradient id="cyanG"><stop offset="0" stop-color="#9ff8ff" stop-opacity=".9"/><stop offset=".4" stop-color="#3fdcff" stop-opacity=".35"/><stop offset="1" stop-color="#3fdcff" stop-opacity="0"/></radialGradient>
+<radialGradient id="lampG"><stop offset="0" stop-color="#fff0b0" stop-opacity=".8"/><stop offset="1" stop-color="#ffb060" stop-opacity="0"/></radialGradient>
+<linearGradient id="shadeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a1f5a" stop-opacity=".45"/><stop offset=".45" stop-color="#3a1f5a" stop-opacity="0"/></linearGradient>
+<filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+<filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+<filter id="blur14"><feGaussianBlur stdDeviation="14"/></filter>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="softsh"><feGaussianBlur stdDeviation="8"/></filter>
+</defs>`;
+
+      // ---------- background
+      function windowView(t) {
+        let s = `<rect x="1000" y="190" width="460" height="360" fill="url(#sky)"/>`;
+        s += `<circle cx="1290" cy="470" r="150" fill="url(#sunG)"/><circle cx="1290" cy="470" r="44" fill="#fff6d0"/>`;
+        // clouds
+        for (const [x, y, s2] of [
+          [1080, 260, 1],
+          [1330, 300, 0.8],
+          [1200, 230, 0.6],
+        ]) {
+          const dx = (t * 6) % 40;
+          s += `<g transform="translate(${f(x + dx)} ${y}) scale(${s2})" fill="#ffd6c0" opacity=".85"><ellipse rx="60" ry="16"/><ellipse cx="-30" cy="-10" rx="30" ry="18"/><ellipse cx="18" cy="-14" rx="34" ry="20"/></g>`;
+        }
+        // far city
+        let bx = 1000;
+        let k = 0;
+        s += `<g fill="#d77d9a" opacity=".9">`;
+        while (bx < 1460) {
+          const w = 40 + rnd(k) * 40,
+            h = 60 + rnd(k + 1) * 90;
+          s += `<rect x="${f(bx)}" y="${f(500 - h)}" width="${f(w)}" height="${f(h + 50)}"/>`;
+          bx += w + 4;
+          k++;
+        }
+        s += `</g>`;
+        bx = 990;
+        k = 20;
+        s += `<g>`;
+        while (bx < 1470) {
+          const w = 50 + rnd(k) * 50,
+            h = 40 + rnd(k + 1) * 70;
+          s += `<rect x="${f(bx)}" y="${f(530 - h)}" width="${f(w)}" height="${f(h + 30)}" fill="#a8507e"/>`;
+          for (let wy = 530 - h + 10; wy < 540; wy += 18)
+            for (let wx = bx + 8; wx < bx + w - 10; wx += 16)
+              if (rnd(wx * 3 + wy) > 0.55)
+                s += `<rect x="${f(wx)}" y="${f(wy)}" width="7" height="9" fill="#ffd36a" opacity=".9"/>`;
+          bx += w + 6;
+          k++;
+        }
+        s += `</g>`;
+        // trees
+        for (let i = 0; i < 8; i++) {
+          const x = 1000 + i * 62 + rnd(i) * 20;
+          s += `<circle cx="${f(x)}" cy="${f(548 - rnd(i + 5) * 20)}" r="${f(34 + rnd(i + 9) * 12)}" fill="${i % 2 ? "#3f7a4e" : "#356b47"}"/>`;
+        }
+        return s;
+      }
+      function kitchen(t) {
+        let s = `<rect x="-400" y="-200" width="2720" height="1100" fill="url(#wall)"/>`;
+        // wall panel stripes
+        for (let x = -400; x < 2400; x += 90)
+          s += `<rect x="${x}" y="-200" width="40" height="1100" fill="#fff" opacity=".04"/>`;
+        s += windowView(t);
+        // window frame
+        s += `<g fill="#fff4e6"><rect x="985" y="175" width="490" height="20" rx="6"/><rect x="985" y="545" width="490" height="22" rx="6"/><rect x="985" y="175" width="20" height="390"/><rect x="1455" y="175" width="20" height="390"/><rect x="1222" y="190" width="14" height="360"/><rect x="1000" y="362" width="460" height="12"/></g>`;
+        s += `<rect x="965" y="560" width="530" height="18" rx="6" fill="#f3e1cc"/>`;
+        // curtains
+        s += `<path d="M930 150 Q960 360 945 600 L1000 600 Q1015 380 990 150Z" fill="#ff8fa0"/><path d="M1470 150 Q1445 380 1460 600 L1515 600 Q1530 360 1530 150Z" fill="#ff8fa0"/><rect x="900" y="140" width="660" height="16" rx="8" fill="#8a5a3a"/>`;
+        s += `<path d="M930 150 Q960 360 945 600 L960 600 Q975 380 950 150Z" fill="#d8667e" opacity=".6"/>`;
+        // upper cabinets
+        for (const [x, w] of [
+          [520, 190],
+          [720, 190],
+          [1560, 170],
+        ]) {
+          s += `<rect x="${x}" y="150" width="${w}" height="240" rx="10" fill="url(#cabU)"/><rect x="${x + 14}" y="166" width="${w - 28}" height="208" rx="8" fill="none" stroke="#1f8a80" stroke-width="5"/><rect x="${x + w - 40}" y="330" width="10" height="34" rx="5" fill="#fbf2df"/><rect x="${x}" y="384" width="${w}" height="10" rx="4" fill="#176d66"/>`;
+        }
+        // shelf with jars under cabinet shadow
+        s += `<rect x="520" y="394" width="390" height="40" fill="#2a1a3a" opacity=".12" filter="url(#blur6)"/>`;
+        // backsplash tiles
+        s += `<rect x="500" y="520" width="1260" height="130" fill="#d7f0e8"/>`;
+        for (let y = 520; y < 650; y += 32)
+          for (let x = 500 + ((y / 32) % 2) * 30; x < 1760; x += 60)
+            s += `<rect x="${x}" y="${y}" width="58" height="30" rx="3" fill="none" stroke="#b5d9cf" stroke-width="3"/>`;
+        // counter + base
+        s += `<rect x="490" y="640" width="1260" height="26" rx="8" fill="#fff6ea"/><rect x="490" y="660" width="1260" height="8" fill="#d8c8b4"/>`;
+        s += `<rect x="505" y="668" width="1230" height="160" fill="url(#cab)"/>`;
+        for (let x = 505; x < 1735; x += 205) {
+          s += `<rect x="${x + 10}" y="680" width="185" height="136" rx="8" fill="none" stroke="#1c7672" stroke-width="5"/><rect x="${x + 82}" y="696" width="40" height="9" rx="4" fill="#fbf2df"/>`;
+        }
+        s += `<rect x="505" y="818" width="1230" height="10" fill="#14504e"/>`;
+        // stove + pan + kettle
+        s += `<rect x="1290" y="632" width="230" height="12" rx="4" fill="#2b2735"/><ellipse cx="1350" cy="626" rx="60" ry="12" fill="#e2584f"/><rect x="1290" y="606" width="120" height="22" rx="10" fill="#e2584f"/><rect x="1405" y="612" width="90" height="10" rx="5" fill="#3a2a2a"/>`;
+        const steam = (x, i) =>
+          `<path d="M${x} 600 q-14 -30 0 -60 q14 -30 0 -60" stroke="#fff" stroke-width="8" fill="none" stroke-linecap="round" opacity="${f(0.25 + 0.15 * Math.sin(t * 2 + i))}" transform="translate(${f(Math.sin(t * 1.5 + i) * 6)} ${f(-((t * 30 + i * 40) % 40))})" filter="url(#blur2)"/>`;
+        s += steam(1330, 0) + steam(1370, 1);
+        // toaster, plant, jars
+        s += `<rect x="640" y="582" width="110" height="60" rx="18" fill="#ff9a3c"/><rect x="660" y="574" width="30" height="10" rx="4" fill="#5a3a2a"/><rect x="700" y="574" width="30" height="10" rx="4" fill="#5a3a2a"/>`;
+        s += `<path d="M880 640 l-10 -50 h60 l-10 50z" fill="#e07a4f"/>`;
+        for (let i = 0; i < 7; i++)
+          s += `<ellipse cx="${900 + (i - 3) * 9}" cy="${560 - rnd(i) * 20}" rx="10" ry="34" fill="${i % 2 ? "#4caf50" : "#3d9a46"}" transform="rotate(${(i - 3) * 14} ${900 + (i - 3) * 9} 590)"/>`;
+        for (let i = 0; i < 3; i++)
+          s += `<rect x="${540 + i * 36}" y="596" width="28" height="44" rx="8" fill="${["#ffe08a", "#ffb3c1", "#bde8ff"][i]}"/><rect x="${540 + i * 36}" y="590" width="28" height="10" rx="4" fill="#c4875a"/>`;
+        // fridge
+        s += `<rect x="1760" y="300" width="230" height="530" rx="22" fill="url(#fridge)"/><rect x="1760" y="480" width="230" height="6" fill="#9aa5c8"/><rect x="1778" y="360" width="10" height="90" rx="5" fill="#8f99bd"/><rect x="1778" y="520" width="10" height="120" rx="5" fill="#8f99bd"/>`;
+        s += `<g transform="translate(1840 520) rotate(-6)"><rect x="-50" y="-40" width="100" height="80" fill="#fff"/><circle cx="-22" cy="-4" r="15" fill="#111"/><rect x="-34" y="12" width="24" height="22" fill="#2fbfb0"/><circle cx="22" cy="-8" r="13" fill="#7a3f17"/><rect x="12" y="6" width="22" height="28" fill="#8e5bd6"/><text x="0" y="-26" text-anchor="middle" ${FONT} font-size="12" fill="#e2584f">MOM + ME</text></g>`;
+        for (const [x, y, c] of [
+          [1930, 360, "#ff5a5a"],
+          [1900, 420, "#ffd21f"],
+          [1950, 560, "#3a8cff"],
+        ])
+          s += `<circle cx="${x}" cy="${y}" r="9" fill="${c}"/>`;
+        // clock
+        s += `<circle cx="400" cy="250" r="56" fill="#fff8ef" stroke="#e2584f" stroke-width="10"/><path d="M400 250 v-32 M400 250 l24 10" stroke="#222" stroke-width="6" stroke-linecap="round"/>`;
+        // door left
+        s += `<rect x="60" y="330" width="250" height="500" rx="10" fill="#8a4f2b"/><rect x="82" y="352" width="206" height="200" rx="8" fill="#9c5c34"/><rect x="82" y="578" width="206" height="230" rx="8" fill="#9c5c34"/><circle cx="270" cy="600" r="12" fill="#ffd21f"/>`;
+        // floor
+        s += `<rect x="-400" y="826" width="2720" height="500" fill="url(#floor)"/>`;
+        for (let y = 850; y < 1300; y += 34 + (y - 850) * 0.15)
+          s += `<rect x="-400" y="${f(y)}" width="2720" height="3" fill="#5a2e2e" opacity=".25"/>`;
+        s += `<rect x="-400" y="826" width="2720" height="14" fill="#3a1c2c" opacity=".35" filter="url(#blur6)"/>`;
+        // sun patch on floor + reflection of window
+        s += `<path d="M990 840 L1480 840 L1300 1180 L700 1180Z" fill="url(#patch)" style="mix-blend-mode:screen"/>`;
+        s += `<rect x="1000" y="845" width="460" height="120" fill="#ffe4b0" opacity=".12" filter="url(#blur14)"/>`;
+        // table + chairs (left middle)
+        s += `<g><rect x="330" y="760" width="12" height="150" fill="#7a4526"/><rect x="600" y="760" width="12" height="150" fill="#7a4526"/><rect x="300" y="742" width="340" height="24" rx="8" fill="#c98a4a"/><rect x="300" y="760" width="340" height="8" fill="#9a6235"/>
+  <ellipse cx="470" cy="730" rx="70" ry="22" fill="#7ec8e3"/><circle cx="445" cy="716" r="18" fill="#ff4d4d"/><circle cx="480" cy="712" r="18" fill="#ffcf3a"/><circle cx="505" cy="720" r="15" fill="#ff8c2b"/></g>`;
+        // pendant lamp
+        s += `<rect x="468" y="-200" width="4" height="330" fill="#2a2030"/><path d="M420 160 L520 160 L500 128 L440 128Z" fill="#2f2f3a"/><ellipse cx="470" cy="166" rx="16" ry="10" fill="#fff3c0"/><circle cx="470" cy="300" r="260" fill="url(#lampG)" opacity=".5"/>`;
+        // rug
+        s += `<ellipse cx="700" cy="960" rx="330" ry="56" fill="#d9577a"/><ellipse cx="700" cy="960" rx="280" ry="44" fill="none" stroke="#ffc6d3" stroke-width="8"/>`;
+        return s;
+      }
+      function lightOver(t) {
+        // god rays from window
+        let s = `<g style="mix-blend-mode:screen" opacity=".55">`;
+        for (let i = 0; i < 4; i++) {
+          const a = 0.8 + 0.2 * Math.sin(t * 0.7 + i);
+          s += `<path d="M${1010 + i * 110} 200 L${1090 + i * 110} 200 L${870 + i * 120} 1100 L${720 + i * 120} 1100Z" fill="url(#ray)" opacity="${f(0.5 * a)}" filter="url(#blur14)"/>`;
+        }
+        s += `</g>`;
+        // dust motes in light
+        for (let i = 0; i < 40; i++) {
+          const x = 900 + rnd(i) * 560 + Math.sin(t * 0.4 + i) * 30,
+            y = 300 + ((rnd(i + 3) * 700 + t * (8 + rnd(i + 5) * 14)) % 700);
+          s += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(1.5 + rnd(i + 7) * 2.5)}" fill="#fff4c8" opacity="${f(0.35 + 0.35 * Math.sin(t * 2 + i))}"/>`;
+        }
+        return s;
+      }
+
+      // ---------- characters
+      function face(o, h) {
+        const r = 0.17 * h,
+          lx = (o.look || 0) * 0.05 * h,
+          ly = (o.lookY || 0) * 0.03 * h;
+        let s = "";
+        const e = o.expr || "happy",
+          big = e === "shock" ? 1.2 : 1;
+        const blink = o.blink;
+        for (const sd of [-1, 1]) {
+          const ex = sd * 0.062 * h + lx * 0.6,
+            ey = -0.01 * h + ly * 0.4;
+          if (blink) {
+            s += `<path d="M${f(ex - 0.04 * h)} ${f(ey)} q${f(0.04 * h)} ${f(0.02 * h)} ${f(0.08 * h)} 0" stroke="#fff" stroke-width="${f(0.012 * h)}" fill="none" stroke-linecap="round"/>`;
+            continue;
+          }
+          s += `<ellipse cx="${f(ex)}" cy="${f(ey)}" rx="${f(0.044 * h * big)}" ry="${f(0.058 * h * big)}" fill="#fffaf0"/>`;
+          s += `<circle cx="${f(ex + lx * 0.35)}" cy="${f(ey + ly * 0.5 + 0.008 * h)}" r="${f(0.021 * h)}" fill="#111"/><circle cx="${f(ex + lx * 0.35 + 0.008 * h)}" cy="${f(ey + ly * 0.5 - 0.004 * h)}" r="${f(0.007 * h)}" fill="#fff"/>`;
+          // brows
+          if (o.oneBrow && sd < 0) continue;
+          const by = ey - 0.08 * h * big,
+            tilt =
+              e === "worried" || e === "sad"
+                ? sd * -0.03 * h
+                : e === "angry"
+                  ? sd * 0.03 * h
+                  : 0;
+          s += `<path d="M${f(ex - 0.035 * h)} ${f(by + tilt)} L${f(ex + 0.035 * h)} ${f(by - tilt)}" stroke="${o.browC || "#fff"}" stroke-width="${f(0.014 * h)}" stroke-linecap="round"/>`;
+        }
+        // blush
+        for (const sd of [-1, 1])
+          s += `<ellipse cx="${f(sd * 0.105 * h + lx * 0.5)}" cy="${f(0.045 * h)}" rx="${f(0.025 * h)}" ry="${f(0.014 * h)}" fill="#ff7f9a" opacity=".7"/>`;
+        const mx = lx * 0.5,
+          my = 0.075 * h + ly * 0.3;
+        if (e === "happy")
+          s += `<path d="M${f(mx - 0.04 * h)} ${f(my)} q${f(0.04 * h)} ${f(0.04 * h)} ${f(0.08 * h)} 0" stroke="#fff" stroke-width="${f(0.012 * h)}" fill="none" stroke-linecap="round"/>`;
+        else if (e === "shock") {
+          const o2 = o.mouthOpen ?? 1;
+          s += `<ellipse cx="${f(mx)}" cy="${f(my + 0.01 * h)}" rx="${f(0.03 * h)}" ry="${f(0.04 * h * o2)}" fill="#ff8a9c" stroke="#fff" stroke-width="${f(0.008 * h)}"/>`;
+        } else if (e === "worried")
+          s += `<path d="M${f(mx - 0.035 * h)} ${f(my + 0.01 * h)} q${f(0.0175 * h)} ${f(-0.015 * h)} ${f(0.035 * h)} 0 t${f(0.035 * h)} 0" stroke="#fff" stroke-width="${f(0.01 * h)}" fill="none" stroke-linecap="round"/>`;
+        else
+          s += `<path d="M${f(mx - 0.035 * h)} ${f(my + 0.015 * h)} q${f(0.035 * h)} ${f(-0.03 * h)} ${f(0.07 * h)} 0" stroke="#fff" stroke-width="${f(0.011 * h)}" fill="none" stroke-linecap="round"/>`;
+        return s;
+      }
+      function arm(sx, sy, a, el, len, w, col, h) {
+        // a: shoulder angle (0 = down), el: elbow bend
+        const x1 = sx + Math.sin(a) * len,
+          y1 = sy + Math.cos(a) * len,
+          x2 = x1 + Math.sin(a + el) * len * 0.95,
+          y2 = y1 + Math.cos(a + el) * len * 0.95;
+        return {
+          svg: `<path d="M${f(sx)} ${f(sy)} L${f(x1)} ${f(y1)} L${f(x2)} ${f(y2)}" stroke="${col}" stroke-width="${f(w)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${f(x2)}" cy="${f(y2)}" r="${f(0.022 * h)}" fill="#0d0b12"/>`,
+          hx: x2,
+          hy: y2,
+        };
+      }
+      function person(o) {
+        const h = o.h,
+          top = o.top,
+          dark = o.dark;
+        let s = "";
+        const sq = o.sq || 1; // squash
+        // shadow (cast to the left, away from window)
+        s += `<ellipse cx="${f(-0.08 * h)}" cy="0" rx="${f(0.2 * h)}" ry="${f(0.03 * h)}" fill="#2a1230" opacity=".35" filter="url(#softsh)"/>`;
+        s += `<g transform="scale(${f(1 / Math.sqrt(sq))} ${f(sq)})">`;
+        const hip = -0.43 * h;
+        // legs
+        const leg = (x, a) => {
+          const x2 = x + Math.sin(a) * 0.33 * h,
+            y2 = hip + Math.cos(a) * 0.43 * h;
+          return `<path d="M${f(x)} ${f(hip)} L${f(x2)} ${f(y2)}" stroke="#0d0b12" stroke-width="${f(0.024 * h)}" stroke-linecap="round"/><ellipse cx="${f(x2 + 0.02 * h * (o.face || 1))}" cy="${f(y2 - 0.012 * h)}" rx="${f(0.038 * h)}" ry="${f(0.019 * h)}" fill="${o.shoe || "#ffd21f"}"/>`;
+        };
+        if (!o.dress) s += leg(-0.032 * h, o.lL || 0) + leg(0.032 * h, o.lR || 0);
+        else s += leg(-0.045 * h, o.lL || 0) + leg(0.045 * h, o.lR || 0);
+        const bodyY = -0.665 * h;
+        let armsBack = "",
+          armsFront = "";
+        const sw = 0.028 * h;
+        const A1 = arm(
+            -0.068 * h,
+            -0.64 * h,
+            o.aL ?? -0.15,
+            o.eL ?? -0.1,
+            0.165 * h,
+            sw,
+            top,
+            h,
+          ),
+          A2 = arm(
+            0.068 * h,
+            -0.64 * h,
+            o.aR ?? 0.15,
+            o.eR ?? 0.1,
+            0.165 * h,
+            sw,
+            top,
+            h,
+          );
+        o._hand = { x: A2.hx, y: A2.hy, xl: A1.hx, yl: A1.hy };
+        // torso
+        if (o.dress) {
+          s += `<path d="M${f(-0.07 * h)} ${f(bodyY)} Q0 ${f(bodyY - 0.02 * h)} ${f(0.07 * h)} ${f(bodyY)} L${f(0.13 * h)} ${f(-0.29 * h)} Q0 ${f(-0.26 * h)} ${f(-0.13 * h)} ${f(-0.29 * h)}Z" fill="${top}"/>`;
+          s += `<path d="M${f(-0.045 * h)} ${f(-0.56 * h)} L${f(0.045 * h)} ${f(-0.56 * h)} L${f(0.07 * h)} ${f(-0.31 * h)} Q0 ${f(-0.3 * h)} ${f(-0.07 * h)} ${f(-0.31 * h)}Z" fill="#fff6ee"/>`;
+          s += `<path d="M${f(0.07 * h)} ${f(bodyY)} L${f(0.13 * h)} ${f(-0.29 * h)} Q${f(0.06 * h)} ${f(-0.27 * h)} ${f(0.04 * h)} ${f(-0.29 * h)} L${f(0.035 * h)} ${f(bodyY)}Z" fill="${dark}" opacity=".35"/>`;
+        } else {
+          s += `<path d="M${f(-0.072 * h)} ${f(bodyY + 0.02 * h)} Q${f(-0.08 * h)} ${f(bodyY - 0.01 * h)} ${f(-0.048 * h)} ${f(bodyY - 0.015 * h)} L${f(0.048 * h)} ${f(bodyY - 0.015 * h)} Q${f(0.08 * h)} ${f(bodyY - 0.01 * h)} ${f(0.072 * h)} ${f(bodyY + 0.02 * h)} L${f(0.055 * h)} ${f(hip + 0.01 * h)} Q0 ${f(hip + 0.03 * h)} ${f(-0.055 * h)} ${f(hip + 0.01 * h)}Z" fill="${top}"/>`;
+          // shading (shadow side = left), rim light right
+          s += `<path d="M${f(-0.072 * h)} ${f(bodyY + 0.02 * h)} L${f(-0.055 * h)} ${f(hip + 0.01 * h)} Q${f(-0.055 * h)} ${f(hip + 0.02 * h)} ${f(-0.048 * h)} ${f(hip + 0.02 * h)} L${f(-0.04 * h)} ${f(bodyY)}Z" fill="${dark}" opacity=".4"/>`;
+          s += `<path d="M${f(0.072 * h)} ${f(bodyY + 0.02 * h)} L${f(0.055 * h)} ${f(hip + 0.01 * h)}" stroke="#ffe0a0" stroke-width="${f(0.008 * h)}" opacity=".7" stroke-linecap="round"/>`;
+          // pocket + strings + ?
+          s += `<path d="M${f(-0.048 * h)} ${f(hip - 0.02 * h)} L${f(-0.034 * h)} ${f(hip - 0.08 * h)} L${f(0.034 * h)} ${f(hip - 0.08 * h)} L${f(0.048 * h)} ${f(hip - 0.02 * h)}" fill="none" stroke="${dark}" stroke-width="${f(0.008 * h)}" opacity=".6"/>`;
+          if (o.q)
+            s += `<text x="0" y="${f(-0.51 * h)}" text-anchor="middle" ${FONT} font-size="${f(0.075 * h)}" fill="#ffd21f" stroke="#14101f" stroke-width="${f(0.012 * h)}" paint-order="stroke">?</text>`;
+          s += `<path d="M${f(-0.02 * h)} ${f(bodyY + 0.01 * h)} v${f(0.048 * h)} M${f(0.02 * h)} ${f(bodyY + 0.01 * h)} v${f(0.06 * h)}" stroke="#fff" stroke-width="${f(0.007 * h)}" stroke-linecap="round"/>`;
+          // hood rim
+          s += `<path d="M${f(-0.04 * h)} ${f(bodyY)} Q0 ${f(bodyY + 0.034 * h)} ${f(0.04 * h)} ${f(bodyY)}" stroke="${dark}" stroke-width="${f(0.024 * h)}" fill="none" stroke-linecap="round"/>`;
+        }
+        s += A1.svg + A2.svg;
+        // head
+        const hy = -0.8 * h,
+          r = 0.15 * h;
+        s += `<g transform="translate(0 ${f(hy)}) rotate(${f(o.tilt || 0)})">`;
+        if (o.bun) {
+          s += `<circle cx="0" cy="${f(-r * 1.05)}" r="${f(r * 0.42)}" fill="#7a3f17"/><path d="M${f(-r * 1.12)} ${f(r * 0.6)} Q${f(-r * 1.25)} ${f(-r * 1.1)} 0 ${f(-r * 1.12)} Q${f(r * 1.25)} ${f(-r * 1.1)} ${f(r * 1.12)} ${f(r * 0.6)} L${f(r * 0.85)} ${f(r * 0.6)} Q${f(r * 0.9)} ${f(-r * 0.6)} 0 ${f(-r * 0.75)} Q${f(-r * 0.9)} ${f(-r * 0.6)} ${f(-r * 0.85)} ${f(r * 0.6)}Z" fill="#7a3f17"/>`;
+        }
+        s += `<circle r="${f(r)}" fill="url(#headG)"/>`;
+        s += `<path d="M${f(r * 0.35)} ${f(-r * 0.9)} A${f(r)} ${f(r)} 0 0 1 ${f(r * 0.95)} ${f(r * 0.25)}" stroke="#ffd79a" stroke-width="${f(0.01 * h)}" fill="none" opacity=".75" stroke-linecap="round"/>`;
+        s += `<ellipse cx="${f(-r * 0.38)}" cy="${f(-r * 0.55)}" rx="${f(r * 0.22)}" ry="${f(r * 0.12)}" fill="#fff" opacity=".12" transform="rotate(-30 ${f(-r * 0.38)} ${f(-r * 0.55)})"/>`;
+        if (o.bun)
+          s += `<path d="M${f(-r * 1.0)} ${f(-r * 0.1)} Q${f(-r * 0.7)} ${f(-r * 1.0)} 0 ${f(-r * 0.98)} Q${f(r * 0.7)} ${f(-r * 1.0)} ${f(r * 1.0)} ${f(-r * 0.1)} Q${f(r * 0.6)} ${f(-r * 0.75)} 0 ${f(-r * 0.7)} Q${f(-r * 0.6)} ${f(-r * 0.75)} ${f(-r * 1.0)} ${f(-r * 0.1)}Z" fill="#8a4a1c"/>`;
+        if (o.tuft)
+          s += `<path d="M${f(-0.02 * h)} ${f(-r * 0.92)} l${f(0.045 * h)} ${f(-0.07 * h)} l${f(-0.025 * h)} 0 l${f(0.05 * h)} ${f(-0.08 * h)} l${f(-0.085 * h)} ${f(0.09 * h)} l${f(0.03 * h)} 0 l${f(-0.035 * h)} ${f(0.06 * h)}Z" fill="#ffd21f" stroke="#c99a00" stroke-width="${f(0.004 * h)}" filter="url(#glow)"/>`;
+        s += `<g transform="scale(0.88)">${face(o, h)}</g>`;
+        s += `</g></g>`;
+        return s;
+      }
+      function placed(x, y, o) {
+        const s = person(o);
+        return {
+          svg: `<g transform="translate(${f(x)} ${f(y)})">${s}</g>`,
+          hand: {
+            x: x + o._hand.x,
+            y: y + o._hand.y,
+            xl: x + o._hand.xl,
+            yl: y + o._hand.yl,
+          },
+        };
+      }
+
+      function bubble(x, y, txt, p, size = 44, tail = -1) {
+        if (p <= 0) return "";
+        const s = back(clamp(p * 1.6));
+        const w = txt.length * size * 0.62 + 60,
+          hh = size * 1.7;
+        return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s)})" opacity="${f(clamp(p * 4))}"><path d="M${f(-w / 2)} ${f(-hh / 2)} h${f(w)} a20 20 0 0 1 20 20 v${f(hh - 40)} a20 20 0 0 1 -20 20 h${f(-w / 2 + 30 + tail * 20)} l${f(-tail * 30 - 15)} 34 l${f(-10)} -34 h${f(-w / 2 + 5)} a20 20 0 0 1 -20 -20 v${f(-hh + 40)} a20 20 0 0 1 20 -20z" fill="#fff" stroke="#1a1030" stroke-width="5"/><text y="${f(size * 0.36)}" text-anchor="middle" ${FONT} font-size="${size}" fill="#1a1030">${txt}</text></g>`;
+      }
+
+      // ---------- shots
+      function cam(t, Z, M) {
+        // returns [cx,cy,zoom]
+        const zH = Z.hand,
+          zx = Z.x;
+        if (t < 3.15) {
+          const k = eio(t / 3.15);
+          return [lerp(900, 980, k), lerp(600, 620, k), lerp(1.0, 1.12, k)];
+        }
+        if (t < 4.45) {
+          const k = eo((t - 3.15) / 1.3);
+          return [zx + 40, lerp(690, 670, k), lerp(2.05, 2.15, k)];
+        }
+        if (t < 6.4) {
+          const k = eo((t - 4.45) / 1.9);
+          return [M.x - 30, lerp(700, 690, k), lerp(1.85, 2.0, k)];
+        }
+        if (t < 8.4) {
+          const k = eio((t - 6.4) / 2);
+          return [zx + 60, lerp(690, 660, k), lerp(2.0, 2.3, k)];
+        }
+        if (t < 10.9) {
+          const k = eio((t - 8.4) / 2.5);
+          return [zx + 80, lerp(650, 640, k), lerp(2.5, 2.9, k)];
+        }
+        const k = eio((t - 10.9) / 4.1);
+        return [lerp(zx + 60, 960, k), lerp(660, 560, k), lerp(2.2, 1.0, k)];
+      }
+
+      window.renderAt = (t) => {
+        // ----- ZAP
+        const ZH = 330;
+        let zx,
+          zy = 905,
+          lL = 0,
+          lR = 0,
+          aL = -0.15,
+          aR = 0.15,
+          eL = -0.1,
+          eR = 0.1,
+          expr = "happy",
+          look = 0.3,
+          lookY = 0,
+          sq = 1,
+          tilt = 0,
+          bob = 0;
+        if (t < 3.0) {
+          const k = clamp(t / 3.0);
+          zx = lerp(-120, 760, eo(k * 1.08));
+          const ph = t * 9;
+          const amp = 0.22 * (1 - clamp((t - 2.6) / 0.4));
+          lL = Math.sin(ph) * amp;
+          lR = -Math.sin(ph) * amp;
+          aL = -0.15 - Math.sin(ph) * amp * 1.6;
+          aR = 0.15 - Math.sin(ph) * amp * 1.6;
+          bob = (-Math.abs(Math.sin(ph)) * 12 * amp) / 0.42;
+          look = 0.8;
+        } else {
+          zx = 760;
+          const k = t - 3.0;
+          if (k < 0.3) sq = 1 - Math.sin((k / 0.3) * Math.PI) * 0.07;
+          look = 0.8;
+        }
+        if (t >= 3.1 && t < 4.6) {
+          const k = eo((t - 3.1) / 0.2);
+          aR = lerp(0.15, 2.6, k);
+          eR = 0.5 + Math.sin(t * 16) * 0.45 * k;
+          tilt = Math.sin(t * 3) * 4;
+        }
+        if (t >= 4.6 && t < 6.4) {
+          expr = "shock";
+          aR = lerp(2.6, 0.3, eo((t - 4.6) / 0.3));
+          const j = t - 4.6;
+          bob = -Math.max(0, Math.sin(j * 14)) * 18 * clamp(1 - j * 2);
+          look = 0.9;
+        }
+        if (t >= 6.4) {
+          expr = t < 8.5 ? "worried" : "shock";
+          const k = eo((t - 6.4) / 0.6);
+          aR = lerp(0.15, 0.55, k);
+          eR = lerp(0.1, 1.7, k);
+          look = lerp(0.9, 0.75, k);
+          lookY = lerp(0, 1, k);
+          tilt = lerp(0, 8, k);
+        }
+        if (t >= 10.9) {
+          const k = eo((t - 10.9) / 0.8);
+          lookY = lerp(1, 0, k);
+          look = lerp(0.55, 0, k);
+          tilt = lerp(8, 0, k);
+        }
+        const zblink = [1.6, 5.9, 9.8, 13.2].some(
+          (b) => Math.abs(t - b) < 0.07,
+        );
+        const fade = t < 6.6 ? 0 : clamp((t - 6.6) / 4.2),
+          bodyFade = t < 9.5 ? 0 : clamp((t - 9.5) / 5) * 0.55;
+        const fl = 0.08 * Math.sin(t * 23) * Math.sin(t * 7.3);
+        const Zo = {
+          h: ZH,
+          top: "#2fbfb0",
+          dark: "#1a7d77",
+          q: true,
+          tuft: true,
+          oneBrow: true,
+          browC: "#ffd21f",
+          lL,
+          lR,
+          aL,
+          aR,
+          eL,
+          eR,
+          expr,
+          look,
+          lookY,
+          tilt,
+          sq,
+          blink: zblink,
+          face: 1,
+        };
+        const Zp = placed(zx, zy + bob, Zo);
+        // ----- MOM
+        const MH = 370;
+        const mx = 1420,
+          my = 900;
+        let mexpr = "happy",
+          mlook = 0.9,
+          maL = -0.2,
+          maR = 0.4,
+          meL = -0.2,
+          meR = 1.9,
+          mtilt = 0,
+          mbob = 0,
+          mouth = 1;
+        if (t < 4.35) {
+          mlook = 0.9 + Math.sin(t) * 0.05;
+          maR = 0.4;
+          meR = 1.9;
+        } else {
+          const k = eo((t - 4.35) / 0.3);
+          mlook = lerp(0.9, -1, k);
+          mexpr = "shock";
+          maL = lerp(-0.2, -2.5, eo((t - 4.6) / 0.22));
+          meL = -0.4;
+          maR = lerp(0.4, 2.5, eo((t - 4.7) / 0.22));
+          meR = 0.4;
+          const j = t - 4.45;
+          mbob = -Math.max(0, Math.sin(j * 14)) * 16 * clamp(1 - j * 1.6);
+          mtilt = Math.sin(t * 30) * 1.2 * clamp(1 - (t - 4.45));
+          mouth = 0.8 + 0.2 * Math.sin(t * 20);
+        }
+        if (t >= 6.3) mexpr = "worried";
+        const mblink = [2.4, 7.4, 12].some((b) => Math.abs(t - b) < 0.07);
+        const Mo = {
+          h: MH,
+          top: "#8e5bd6",
+          dark: "#4b2b80",
+          dress: true,
+          bun: true,
+          browC: "#7a3f17",
+          shoe: "#e2584f",
+          aL: maL,
+          aR: maR,
+          eL: meL,
+          eR: meR,
+          expr: mexpr,
+          look: mlook,
+          tilt: mtilt,
+          blink: mblink,
+          mouthOpen: mouth,
+          face: -1,
+        };
+        const Mp = placed(mx, my + mbob, Mo);
+        // ----- mug
+        let mug = "";
+        const drop = 4.8,
+          g = 2400;
+        const mugSvg = (x, y, r) =>
+          `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(r)})"><rect x="-17" y="-22" width="34" height="40" rx="6" fill="#fff"/><rect x="-17" y="-6" width="34" height="8" fill="#ff5a7a"/><path d="M17 -12 q16 0 16 12 q0 12 -16 12" stroke="#fff" stroke-width="6" fill="none"/><ellipse cx="0" cy="-20" rx="14" ry="4" fill="#6b3a1a"/></g>`;
+        let crashT = -1;
+        if (t < drop) mug = mugSvg(Mp.hand.x + 4, Mp.hand.y - 16, 0);
+        else {
+          const p0 = { x: 1522, y: 687 };
+          const tt = t - drop,
+            tHit = Math.sqrt((2 * (905 - p0.y)) / g);
+          if (tt < tHit)
+            mug = mugSvg(p0.x + 40 * tt, p0.y + 0.5 * g * tt * tt, tt * 500);
+          else {
+            const ht = tt - tHit;
+            crashT = ht;
+            const hx = p0.x + 40 * tHit;
+            mug += `<ellipse cx="${f(hx)}" cy="912" rx="${f(20 + eo(ht * 2) * 80)}" ry="${f(5 + eo(ht * 2) * 16)}" fill="#6b3a1a" opacity=".9"/>`;
+            for (let i = 0; i < 10; i++) {
+              const a = -Math.PI * rnd(i),
+                v = 300 + rnd(i + 20) * 500,
+                vx = Math.cos(a) * v,
+                vy = Math.sin(a) * v * 1.3;
+              const tt2 = Math.min(ht, 0.6);
+              let y = 905 + vy * tt2 + 0.5 * g * tt2 * tt2;
+              y = Math.min(y, 912);
+              const x = hx + vx * tt2;
+              mug += `<path d="M0 -8 L9 4 L-7 6Z" transform="translate(${f(x)} ${f(y)}) rotate(${f(ht * 600 * rnd(i))})" fill="${i % 3 ? "#fff" : "#ff5a7a"}"/>`;
+            }
+            for (let i = 0; i < 14; i++) {
+              const a = -Math.PI * (0.15 + 0.7 * rnd(i + 40)),
+                v = 250 + rnd(i + 41) * 450;
+              const y = 905 + Math.sin(a) * v * ht + 0.5 * g * ht * ht;
+              if (y < 910)
+                mug += `<circle cx="${f(hx + Math.cos(a) * v * ht)}" cy="${f(y)}" r="${f(4 + rnd(i + 42) * 5)}" fill="#6b3a1a"/>`;
+            }
+            if (ht < 0.25)
+              mug += `<g opacity="${f(1 - ht / 0.25)}" stroke="#fff" stroke-width="6" stroke-linecap="round">${[
+                0, 1, 2, 3, 4,
+              ]
+                .map((i) => {
+                  const a = -Math.PI * (0.1 + 0.2 * i);
+                  return `<path d="M${f(hx + Math.cos(a) * 40)} ${f(905 + Math.sin(a) * 40)} L${f(hx + Math.cos(a) * (70 + ht * 300))} ${f(905 + Math.sin(a) * (70 + ht * 300))}"/>`;
+                })
+                .join("")}</g>`;
+          }
+        }
+        // ----- fading pixels + glow
+        let px = "";
+        const hp = Zp.hand;
+        const nH = Math.floor(fade * 70),
+          nB = Math.floor(bodyFade * 150);
+        for (let i = 0; i < nH + nB; i++) {
+          const life = (t * 0.5 + rnd(i) * 1.0) % 1;
+          const fromB = i >= nH;
+          const bx = fromB
+              ? zx + (rnd(i + 3) - 0.5) * 0.3 * ZH
+              : hp.x + (rnd(i + 3) - 0.5) * 26,
+            by = fromB
+              ? zy - rnd(i + 4) * ZH * 0.95
+              : hp.y + (rnd(i + 4) - 0.5) * 26;
+          const x =
+              bx +
+              Math.sin(t * 2 + i) * 10 * life +
+              (rnd(i + 5) - 0.5) * 20 * life,
+            y = by - life * (120 + rnd(i + 6) * 120);
+          const sz = (4 + rnd(i + 7) * 8) * (1 - life * 0.5);
+          px += `<rect x="${f(x - sz / 2)}" y="${f(y - sz / 2)}" width="${f(sz)}" height="${f(sz)}" rx="1.5" fill="${i % 3 ? "#9ff8ff" : "#ffffff"}" opacity="${f((1 - life) * 0.95)}"/>`;
+        }
+        // Zap with fading: whole-body opacity + hand mask fade
+        const zOp = clamp(1 - bodyFade + fl * (bodyFade > 0 ? 1 : 0), 0.25, 1);
+        const handFadeCircle =
+          fade > 0
+            ? `<circle cx="${f(hp.x)}" cy="${f(hp.y)}" r="${f(18 + fade * 30)}" fill="url(#cyanG)" opacity="${f(fade * (0.8 + 0.2 * Math.sin(t * 9)))}"/>`
+            : "";
+        // ----- compose world
+        const [cx, cy, zm] = cam(t, { x: zx, hand: hp }, { x: mx });
+        let shx = 0,
+          shy = 0;
+        if (crashT >= 0 && crashT < 0.45) {
+          const a = (1 - crashT / 0.45) * 9;
+          shx = Math.sin(crashT * 90) * a;
+          shy = Math.cos(crashT * 77) * a;
+        }
+        const hhx = Math.sin(t * 1.3) * 2,
+          hhy = Math.sin(t * 1.7) * 2;
+        let world = kitchen(t);
+        world += Mp.svg + mug;
+        // hand dissolve: draw zap, then a cyan-tinted overlay at hand fading it out
+        world += `<g opacity="${f(zOp)}">${Zp.svg}</g>`;
+        if (fade > 0)
+          world += `<circle cx="${f(hp.x)}" cy="${f(hp.y)}" r="${f(0.04 * ZH)}" fill="#bff6ff" opacity="${f(fade * 0.85)}"/>`;
+        world += handFadeCircle;
+        if (bodyFade > 0)
+          world += `<ellipse cx="${f(zx)}" cy="${f(zy - ZH * 0.5)}" rx="${f(ZH * 0.4)}" ry="${f(ZH * 0.65)}" fill="url(#cyanG)" opacity="${f(bodyFade * 0.55)}"/>`;
+        world += `<g filter="url(#glow)">${px}</g>`;
+        world += lightOver(t);
+        // bubbles in world space
+        if (t > 3.3 && t < 4.5)
+          world += bubble(
+            zx + 120,
+            zy - ZH * 1.12,
+            "Morning, Mom!",
+            (t - 3.3) / 0.3,
+            30,
+            -1,
+          );
+        if (t > 4.55 && t < 6.35)
+          world += bubble(
+            mx - 70,
+            my - MH * 1.15,
+            "WHO ARE YOU?!",
+            (t - 4.55) / 0.3,
+            34,
+            1,
+          );
+        const tr = `translate(${f(960 + shx + hhx)} ${f(540 + shy + hhy)}) scale(${f(zm)}) translate(${f(-cx)} ${f(-cy)})`;
+        let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}<g transform="${tr}">${world}</g>`;
+        // grade: purple shade left, warm top-right, vignette
+        s += `<rect width="${W}" height="${H}" fill="url(#shadeL)" style="mix-blend-mode:multiply"/>`;
+        s += `<rect width="${W}" height="${H}" fill="#ff9a50" opacity=".06" style="mix-blend-mode:screen"/>`;
+        s += `<rect width="${W}" height="${H}" fill="url(#vig)"/>`;
+        // title
+        if (t > 11.3) {
+          const k = clamp((t - 11.3) / 0.35);
+          const sc = k < 1 ? back(k) : 1;
+          s += `<g transform="translate(960 190) scale(${f(sc)}) rotate(-2)" opacity="${f(clamp(k * 3))}"><text text-anchor="middle" ${FONT} font-size="104" fill="#ffd21f" stroke="#14101f" stroke-width="22" paint-order="stroke" stroke-linejoin="round">WHAT IF <tspan fill="#fff">EVERYONE</tspan></text><text y="112" text-anchor="middle" ${FONT} font-size="104" fill="#ffd21f" stroke="#14101f" stroke-width="22" paint-order="stroke" stroke-linejoin="round">FORGOT YOU?</text></g>`;
+        }
+        document.getElementById("st").innerHTML = s;
+        return true;
+      };
+      window.ready = true;
+    </script>
+  </body>
+</html>
