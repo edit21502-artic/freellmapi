@@ -772,6 +772,7 @@ var SX = SNAP.getContext("2d");
     if (ROBOT[o.k] && o.k !== "mapl") {
     }
     var isR = !!ROBOT[o.k];
+    if (window.NOLIGHT) return isR ? drawRobot(o) : _ch(o);
     SX.setTransform(1, 0, 0, 1, 0, 0);
     SX.clearRect(0, 0, W, H);
     SX.drawImage(cv, 0, 0);
