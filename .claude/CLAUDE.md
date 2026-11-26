@@ -20,5 +20,8 @@ black stick legs, thin arms, small shoes. Zap keeps yellow lightning tuft, one y
 Physics-based motion (gravity, bounce, squash & stretch, anticipation, inertia). Never mix 2D and 3D.
 Template: `.claude/youtube/template/scene.html` (SVG scene, `renderAt(t)`), rendered with
 `node r3.js video 0 15 30 out.mp4` (Playwright). It is the 15 s "zap2d_slim" test.
+Voiceover: ONLY Gemini TTS (gemini-2.5-flash-preview-tts, key in env var GEMINI_API_KEY, header
+x-goog-api-key, environment "freellmapi-voice"). Voices: narrator Charon, Zap Puck, Mom Kore. Batch many lines
+per request to stay inside the free daily limit. Kokoro only as fallback if Gemini fails.
 Thumbnails: competitor style (glossy illustrated, huge white/yellow text) generated as an image.
 Answer the user in short, plain Russian.
